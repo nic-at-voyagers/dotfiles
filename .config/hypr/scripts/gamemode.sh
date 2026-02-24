@@ -17,7 +17,7 @@ else
         keyword decoration:inactive_opacity 1;\
         keyword animations:enabled 0;\
         keyword decoration:drop_shadow 0;\
-        keyword decoration:blur:enabled 0;\
+        keyword decoration:blur:disabled 0;\
         keyword decoration:rounding 0"
   touch ~/.cache/gamemode
   notify-send "Gamemode activated" "Animations and blur disabled"
