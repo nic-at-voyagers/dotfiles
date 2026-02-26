@@ -28,6 +28,7 @@
 /home/nic/.config/hypr/hyprland/scripts/zoom.sh
 /home/nic/.config/hypr/hyprlock.conf.new
 /home/nic/.config/hypr/monitors.conf.new
+/home/nic/.config/hypr/workspaces.conf.new
 /home/nic/.config/illogical-impulse/installed_true
 /home/nic/.config/kde-material-you-colors/config.conf
 /home/nic/.config/kitty/kitty.conf
@@ -115,6 +116,10 @@
 /home/nic/.config/quickshell/ii/assets/icons/fluent/bluetooth.svg
 /home/nic/.config/quickshell/ii/assets/icons/fluent/calculator-filled.svg
 /home/nic/.config/quickshell/ii/assets/icons/fluent/calculator.svg
+/home/nic/.config/quickshell/ii/assets/icons/fluent/calendar-add-filled.svg
+/home/nic/.config/quickshell/ii/assets/icons/fluent/calendar-add.svg
+/home/nic/.config/quickshell/ii/assets/icons/fluent/camera-filled.svg
+/home/nic/.config/quickshell/ii/assets/icons/fluent/camera.svg
 /home/nic/.config/quickshell/ii/assets/icons/fluent/caret-down-filled.svg
 /home/nic/.config/quickshell/ii/assets/icons/fluent/caret-down.svg
 /home/nic/.config/quickshell/ii/assets/icons/fluent/caret-up-filled.svg
@@ -130,6 +135,8 @@
 /home/nic/.config/quickshell/ii/assets/icons/fluent/chevron-up-filled.svg
 /home/nic/.config/quickshell/ii/assets/icons/fluent/chevron-up.svg
 /home/nic/.config/quickshell/ii/assets/icons/fluent/corporation.svg
+/home/nic/.config/quickshell/ii/assets/icons/fluent/crop-filled.svg
+/home/nic/.config/quickshell/ii/assets/icons/fluent/crop.svg
 /home/nic/.config/quickshell/ii/assets/icons/fluent/cut-filled.svg
 /home/nic/.config/quickshell/ii/assets/icons/fluent/cut.svg
 /home/nic/.config/quickshell/ii/assets/icons/fluent/dark-theme-filled.svg
@@ -167,6 +174,8 @@
 /home/nic/.config/quickshell/ii/assets/icons/fluent/headphones.svg
 /home/nic/.config/quickshell/ii/assets/icons/fluent/image-copy-filled.svg
 /home/nic/.config/quickshell/ii/assets/icons/fluent/image-copy.svg
+/home/nic/.config/quickshell/ii/assets/icons/fluent/image-edit-filled.svg
+/home/nic/.config/quickshell/ii/assets/icons/fluent/image-edit.svg
 /home/nic/.config/quickshell/ii/assets/icons/fluent/image-filled.svg
 /home/nic/.config/quickshell/ii/assets/icons/fluent/image.svg
 /home/nic/.config/quickshell/ii/assets/icons/fluent/keyboard-dock-filled.svg
@@ -219,6 +228,10 @@
 /home/nic/.config/quickshell/ii/assets/icons/fluent/README.md
 /home/nic/.config/quickshell/ii/assets/icons/fluent/record-filled.svg
 /home/nic/.config/quickshell/ii/assets/icons/fluent/record.svg
+/home/nic/.config/quickshell/ii/assets/icons/fluent/scan-text-filled.svg
+/home/nic/.config/quickshell/ii/assets/icons/fluent/scan-text.svg
+/home/nic/.config/quickshell/ii/assets/icons/fluent/search-visual-filled.svg
+/home/nic/.config/quickshell/ii/assets/icons/fluent/search-visual.svg
 /home/nic/.config/quickshell/ii/assets/icons/fluent/server-filled.svg
 /home/nic/.config/quickshell/ii/assets/icons/fluent/server.svg
 /home/nic/.config/quickshell/ii/assets/icons/fluent/settings-cog-multiple-filled.svg
@@ -256,6 +269,8 @@
 /home/nic/.config/quickshell/ii/assets/icons/fluent/task-view-pressed-light.svg
 /home/nic/.config/quickshell/ii/assets/icons/fluent/temperature-filled.svg
 /home/nic/.config/quickshell/ii/assets/icons/fluent/temperature.svg
+/home/nic/.config/quickshell/ii/assets/icons/fluent/video-filled.svg
+/home/nic/.config/quickshell/ii/assets/icons/fluent/video.svg
 /home/nic/.config/quickshell/ii/assets/icons/fluent/wand-filled.svg
 /home/nic/.config/quickshell/ii/assets/icons/fluent/wand.svg
 /home/nic/.config/quickshell/ii/assets/icons/fluent/weather-moon-filled.svg
@@ -419,6 +434,7 @@
 /home/nic/.config/quickshell/ii/modules/common/widgets/SelectionDialog.qml
 /home/nic/.config/quickshell/ii/modules/common/widgets/SelectionGroupButton.qml
 /home/nic/.config/quickshell/ii/modules/common/widgets/shapes/example.qml
+/home/nic/.config/quickshell/ii/modules/common/widgets/shapes/example-squircle.qml
 /home/nic/.config/quickshell/ii/modules/common/widgets/shapes/geometry/offset.js
 /home/nic/.config/quickshell/ii/modules/common/widgets/shapes/.git
 /home/nic/.config/quickshell/ii/modules/common/widgets/shapes/.gitignore
@@ -883,6 +899,7 @@
 /home/nic/.config/quickshell/ii/services/EasyEffects.qml
 /home/nic/.config/quickshell/ii/services/Emojis.qml
 /home/nic/.config/quickshell/ii/services/FirstRunExperience.qml
+/home/nic/.config/quickshell/ii/services/GlobalFocusGrab.qml
 /home/nic/.config/quickshell/ii/services/HyprlandData.qml
 /home/nic/.config/quickshell/ii/services/HyprlandKeybinds.qml
 /home/nic/.config/quickshell/ii/services/HyprlandXkb.qml
@@ -914,6 +931,7 @@
 /home/nic/.config/quickshell/ii/services/Ydotool.qml
 /home/nic/.config/quickshell/ii/settings.qml
 /home/nic/.config/quickshell/ii/shell.qml
+/home/nic/.config/quickshell/ii/translations/de_DE.json
 /home/nic/.config/quickshell/ii/translations/en_US.json
 /home/nic/.config/quickshell/ii/translations/he_HE.json
 /home/nic/.config/quickshell/ii/translations/it_IT.json
@@ -932,10 +950,13 @@
 /home/nic/.config/quickshell/ii/welcome.qml
 /home/nic/.config/starship.toml
 /home/nic/.config/thorium-flags.conf
+/home/nic/.config/wlogout/layout
+/home/nic/.config/wlogout/style.css
 /home/nic/.config/xdg-desktop-portal/hyprland-portals.conf
 /home/nic/.config/zshrc.d/auto-Hypr.sh
 /home/nic/.config/zshrc.d/dots-hyprland.zsh
 /home/nic/.config/zshrc.d/shortcuts.zsh
+/home/nic/.local/share/fonts/illogical-impulse-google-sans-flex
 /home/nic/.local/share/fonts/illogical-impulse-google-sans-flex/.git/config
 /home/nic/.local/share/fonts/illogical-impulse-google-sans-flex/.git/description
 /home/nic/.local/share/fonts/illogical-impulse-google-sans-flex/.git/FETCH_HEAD

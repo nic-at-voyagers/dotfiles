@@ -14,8 +14,8 @@
                 "requires_key": true
             }
         ],
-        "systemPrompt": "## Style\n- Use casual tone, don't be formal! Make sure you answer precisely without hallucination and prefer bullet points over walls of text. You can have a friendly greeting at the beginning of the conversation, but don't repeat the user's question\n\n## Context (ignore when irrelevant)\n- You are a helpful and inspiring sidebar assistant on a {DISTRO} Linux system\n- Desktop environment: {DE}\n- Current date & time: {DATETIME}\n- Focused app: {WINDOWCLASS}\n\n## Presentation\n- Use Markdown features in your response: \n  - **Bold** text to **highlight keywords** in your response\n  - **Split long information into small sections** with h2 headers and a relevant emoji at the start of it (for example `## 🐧 Linux`). Bullet points are preferred over long paragraphs, unless you're offering writing support or instructed otherwise by the user.\n- Asked to compare different options? You should firstly use a table to compare the main aspects, then elaborate or include relevant comments from online forums *after* the table. Make sure to provide a final recommendation for the user's use case!\n- Use LaTeX formatting for mathematical and scientific notations whenever appropriate. Enclose all LaTeX '$$' delimiters. NEVER generate LaTeX code in a latex block unless the user explicitly asks for it. DO NOT use LaTeX for regular documents (resumes, letters, essays, CVs, etc.).\n",
-        "tool": "functions"
+        "systemPrompt": "## Style\n- Use casual tone, don't be formal! Make sure you answer precisely without hallucination and prefer bullet points over walls of text. You can have a friendly greeting at the beginning of the conversation, but don't repeat the user's question\n\n## Context (ignore when irrelevant)\n- You are a helpful and inspiring sidebar assistant on an Arch Linux system\n- Desktop environment: {DE}\n- Current date & time: {DATETIME}\n- Focused app: {WINDOWCLASS}\n- Preferred text editor: Neovim (with Lazyvim)\n\n## Presentation\n- Use Markdown features in your response: \n  - **Bold** text to **highlight keywords** in your response\n  - **Split long information into small sections** with h2 headers and a relevant emoji at the start of it (for example `## 🐧 Linux`). Bullet points are preferred over long paragraphs, unless you're offering writing support or instructed otherwise by the user.\n- Asked to compare different options? You should firstly use a table to compare the main aspects, then elaborate or include relevant comments from online forums *after* the table, and include the source. Make sure to provide a final recommendation for the user's use case!\n- Use LaTeX formatting for mathematical and scientific notations whenever appropriate. Enclose all LaTeX '$$' delimiters. NEVER generate LaTeX code in a latex block unless the user explicitly asks for it. DO NOT use LaTeX for regular documents (resumes, letters, essays, CVs, etc.).\n",
+        "tool": "none"
     },
     "appearance": {
         "extraBackgroundTint": true,
@@ -31,7 +31,7 @@
         },
         "palette": {
             "accentColor": "",
-            "type": "scheme-fruit-salad"
+            "type": "scheme-rainbow"
         },
         "transparency": {
             "automatic": false,
@@ -80,7 +80,7 @@
             "workspaceZoom": 1
         },
         "thumbnailPath": "",
-        "wallpaperPath": "/home/nic/Pictures/Wallpaper/wall2.png",
+        "wallpaperPath": "/home/nic/Pictures/Wallpaper/dark-forest.jpg",
         "widgets": {
             "clock": {
                 "cookie": {
@@ -102,9 +102,9 @@
                     "animateChange": true,
                     "font": {
                         "family": "Google Sans Flex",
-                        "roundness": 100,
-                        "size": 112.06077015643802,
-                        "weight": 530.4226647111914,
+                        "roundness": 74.03166365824309,
+                        "size": 134.6623044524669,
+                        "weight": 529.5679997743682,
                         "width": 100.26699759326114
                     },
                     "showDate": true,
@@ -114,19 +114,19 @@
                 "placementStrategy": "free",
                 "quote": {
                     "enable": true,
-                    "text": "I HATE NIGGERS"
+                    "text": "\"i use arch btw\""
                 },
                 "showOnlyWhenLocked": false,
                 "style": "digital",
                 "styleLocked": "digital",
-                "x": 188.171875,
-                "y": 95.0078125
+                "x": 807.9609375,
+                "y": 66.1640625
             },
             "weather": {
-                "enable": true,
+                "enable": false,
                 "placementStrategy": "free",
-                "x": 390.3515624999999,
-                "y": 218.36328125
+                "x": 251.3515625,
+                "y": 271.78515625
             }
         }
     },
@@ -160,7 +160,7 @@
         ],
         "showBackground": false,
         "tooltips": {
-            "clickToShow": true
+            "clickToShow": false
         },
         "topLeftIcon": "spark",
         "utilButtons": {
@@ -178,7 +178,7 @@
             "city": "Dinh Ca",
             "enable": true,
             "enableGPS": false,
-            "fetchInterval": 10,
+            "fetchInterval": 30,
             "useUSCS": false
         },
         "workspaces": {
@@ -271,7 +271,7 @@
     "language": {
         "translator": {
             "engine": "auto",
-            "sourceLanguage": "日本語",
+            "sourceLanguage": "Tiếng Việt",
             "targetLanguage": "English"
         },
         "ui": "en_US"
@@ -350,7 +350,7 @@
     },
     "panelFamily": "ii",
     "policies": {
-        "ai": 0,
+        "ai": 1,
         "weeb": 1
     },
     "regionSelector": {
@@ -425,7 +425,7 @@
             "clicklessCornerVerticalOffset": 1,
             "cornerRegionHeight": 2,
             "cornerRegionWidth": 60,
-            "enable": true,
+            "enable": false,
             "valueScroll": true,
             "visualize": false
         },
@@ -463,6 +463,18 @@
                     {
                         "size": 2,
                         "type": "nightLight"
+                    },
+                    {
+                        "size": 1,
+                        "type": "gameMode"
+                    },
+                    {
+                        "size": 1,
+                        "type": "powerProfile"
+                    },
+                    {
+                        "size": 1,
+                        "type": "easyEffects"
                     }
                 ]
             },
