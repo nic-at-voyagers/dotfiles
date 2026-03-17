@@ -377,7 +377,7 @@ Singleton {
                 property JsonObject blur: JsonObject {
                     property bool enable: true
                     property real radius: 100
-                    property real extraZoom: 1.1
+                    property real extraZoom: 1
                 }
                 property bool centerClock: true
                 property bool showLockedText: true
