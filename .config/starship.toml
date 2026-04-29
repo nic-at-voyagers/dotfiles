@@ -11,24 +11,24 @@ add_newline = false
 # $character
 # """
 format = """
-$cmd_duration [](bold fg:#cdd6f4) $directory $git_branch
-$character"""
+$cmd_duration [](bold fg:#cdd6f4) $directory $git_branch $git_state[$git_status](bold fg:#f9e2af)
+ $character"""
 
 # Replace the "❯" symbol in the prompt with "➜"
 [character]                            # The name of the module we are configuring is "character"
-success_symbol = "[   ](bold fg:blue)"
-error_symbol = "[   ](bold fg:red)"
+success_symbol = "[$hostname  ](bold fg:blue)"
+error_symbol = "[$hostname   ](bold fg:red)"
 
 # Disable the package module, hiding it from the prompt completely
 [package]
 disabled = true
 
 [git_branch]
-style = "bg: cyan"
+style = "bg: fg:#a6e3a1"
 symbol = "󰘬"
 truncation_length = 12
 truncation_symbol = ""
-format = "[](bold fg:cyan)[$symbol $branch(:$remote_branch)](fg:black bg:cyan)[ ](bold fg:cyan)"
+format = "[](bold fg:#a6e3a1)[$symbol $branch(:$remote_branch)](fg:black bg:#a6e3a1)[](bold fg:#a6e3a1)"
 
 [git_commit]
 commit_hash_length = 4
@@ -39,20 +39,27 @@ format = '[\($state( $progress_current of $progress_total)\)]($style) '
 cherry_pick = "[🍒 PICKING](bold red)"
 
 [git_status]
-conflicted = " 🏳 "
-ahead = " 🏎💨 "
-behind = " 😰 "
-diverged = " 😵 "
-untracked = " 🤷 ‍"
-stashed = " 📦 "
-modified = " 📝 "
+conflicted = "🚩"
+ahead = ""
+behind = ""
+diverged = ""
+untracked = ""
+stashed = ""
+modified = ""
 staged = '[++\($count\)](green)'
-renamed = " ✍️ "
-deleted = " 🗑 "
+renamed = "󰂮"
+deleted = "🗑"
+
+[username]
+style_user = "bold bg:cyan fg:black"
+style_root = "red bold"
+format = "[](bold fg:cyan)[$user ]($style)"
+disabled = false
+show_always = true
 
 [hostname]
 ssh_only = false
-format =  "[•$hostname](bg:cyan bold fg:black)[](bold fg:cyan)"
+format =  "[• $hostname](fg:black bg:cyan)[](fg:cyan)"
 trim_at = ".companyname.com"
 disabled = false
 
@@ -70,12 +77,6 @@ disabled = false
 format = '🕙[\[ $time \]]($style) '
 time_format = "%T"
 
-[username]
-style_user = "bold bg:cyan fg:black"
-style_root = "red bold"
-format = "[](bold fg:cyan)[$user]($style)"
-disabled = false
-show_always = true
 
 [directory]
 home_symbol = "  "
