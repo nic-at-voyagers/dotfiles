@@ -137,5 +137,12 @@ export PATH="$PATH:/home/nic/.local/bin"
 export GTK_IM_MODULE=fcitx
 export QT_IM_MODULE=fcitx
 export XMODIFIERS=@im=fcitx
+export PATH=$PATH:/root/.local/share/gem/ruby/3.4.0/bin
 
-alias delcache="./delcache.sh"
+# Load starship prompt
+if test "$TERM" != "linux"; then
+    eval "$(starship init zsh)"
+fi
+
+# Fish-like aliases
+alias ls='eza --icons'
