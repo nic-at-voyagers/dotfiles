@@ -1,4 +1,7 @@
-# Dotfiles for Hyprland
+<div align="center">
+    <h1>nic's customized ii-vynx</h1>
+    <h3></h3>
+</div>
 
 It's just ii-vynx with some tweaks here and there
 
