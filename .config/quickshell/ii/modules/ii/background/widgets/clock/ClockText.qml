@@ -7,7 +7,7 @@ StyledText {
     Layout.fillWidth: true
     font {
         family: Appearance.font.family.expressive
-        pixelSize: 30
+        pixelSize: 20
         weight: 350
         // Set empty to prevent conflicts, not meaningless
         styleName: ""

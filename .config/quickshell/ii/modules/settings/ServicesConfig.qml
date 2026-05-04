@@ -5,6 +5,9 @@ import qs.modules.common
 import qs.modules.common.widgets
 
 ContentPage {
+    id: page
+    readonly property int index: 5
+    property bool register: parent.register ?? false
     forceWidth: true
 
     ContentSection {
@@ -22,6 +25,39 @@ ContentPage {
                 });
             }
         }
+    }
+
+    ContentSection {
+        icon: "album"
+        title: Translation.tr("Media")
+
+        ContentSubsection {
+            title: Translation.tr("Prioritized player")
+            tooltip: Translation.tr("Automatically sets the active player to a newly detected player if its identifier matches the value specified in the priority player property so you dont have to manually set the active player")
+
+            MaterialTextArea {
+                Layout.fillWidth: true
+                placeholderText: Translation.tr("Desktop entry name (e.g. spotify, google-chrome)")
+                text: Config.options.media.priorityPlayer
+                wrapMode: TextEdit.NoWrap
+                onTextChanged: {
+                    Config.options.media.priorityPlayer = text;
+                }
+            }
+        }
+
+        ConfigSwitch {
+            buttonIcon: "filter_list"
+            text: Translation.tr("Filter duplicate players")
+            checked: Config.options.media.filterDuplicatePlayers
+            onCheckedChanged: {
+                Config.options.media.filterDuplicatePlayers = checked;
+            }
+            StyledToolTip {
+                text: Translation.tr("Attempt to remove dupes (the aggregator playerctl one and browsers' native ones when there's plasma browser integration)")
+            }
+        }
+
     }
 
     ContentSection {
@@ -85,6 +121,48 @@ ContentPage {
         
     }
 
+
+    ContentSection {
+        icon: "lyrics"
+        title: Translation.tr("Lyrics")
+
+        ConfigSwitch {
+            buttonIcon: "check"
+            text: Translation.tr("Enable lyrics service")
+            checked: Config.options.lyricsService.enable
+            onCheckedChanged: {
+                Config.options.lyricsService.enable = checked;
+            }
+            StyledToolTip {
+                text: Translation.tr("Disabling this will prevent the API from being called, but already cached lyrics will still be available.")
+            }
+        }
+
+
+        ConfigRow {
+            uniform: true
+
+            ConfigSwitch {
+                enabled: Config.options.lyricsService.enable
+                buttonIcon: "mood"
+                text: Translation.tr("Enable genius lyrics service")
+                checked: Config.options.lyricsService.enableGenius
+                onCheckedChanged: {
+                    Config.options.lyricsService.enableGenius = checked;
+                }
+            }
+            ConfigSwitch {
+                enabled: Config.options.lyricsService.enable
+                buttonIcon: "library_books"
+                text: Translation.tr("Enable lrclib lyrics service")
+                checked: Config.options.lyricsService.enableLrclib
+                onCheckedChanged: {
+                    Config.options.lyricsService.enableLrclib = checked;
+                }
+            }
+        }
+    }
+
     ContentSection {
         icon: "file_open"
         title: Translation.tr("Save paths")
@@ -113,17 +191,6 @@ ContentPage {
     ContentSection {
         icon: "search"
         title: Translation.tr("Search")
-
-        ConfigSwitch {
-            text: Translation.tr("Use Levenshtein distance-based algorithm instead of fuzzy")
-            checked: Config.options.search.sloppy
-            onCheckedChanged: {
-                Config.options.search.sloppy = checked;
-            }
-            StyledToolTip {
-                text: Translation.tr("Could be better if you make a ton of typos,\nbut results can be weird and might not work with acronyms\n(e.g. \"GIMP\" might not give you the paint program)")
-            }
-        }
 
         ContentSubsection {
             title: Translation.tr("Prefixes")
@@ -187,6 +254,15 @@ ContentPage {
                         Config.options.search.prefix.webSearch = text;
                     }
                 }
+                MaterialTextArea {
+                    Layout.fillWidth: true
+                    placeholderText: Translation.tr("File search")
+                    text: Config.options.search.prefix.fileSearch
+                    wrapMode: TextEdit.Wrap
+                    onTextChanged: {
+                        Config.options.search.prefix.fileSearch = text;
+                    }
+                }
             }
         }
         ContentSubsection {
@@ -201,7 +277,71 @@ ContentPage {
                 }
             }
         }
+        ContentSubsection {
+            title: Translation.tr("File search")
+
+            MaterialTextArea {
+                Layout.fillWidth: true
+                placeholderText: Translation.tr("Search directory")
+                text: Config.options.search.fileSearchDirectory
+                wrapMode: TextEdit.Wrap
+                onTextChanged: {
+                    Config.options.search.fileSearchDirectory = text;
+                }
+            }
+
+            ConfigSwitch {
+                buttonIcon: "hide_image"
+                text: Translation.tr("Blur file search result previews")
+                checked: Config.options.search.blurFileSearchResultPreviews
+                onCheckedChanged: {
+                    Config.options.search.blurFileSearchResultPreviews = checked;
+                }
+            }
+
+        }
     }
+
+    ContentSection {
+        icon: "file_open"
+        title: Translation.tr("Wallpaper Browser")
+
+        MaterialTextArea {
+            Layout.fillWidth: true
+            placeholderText: Translation.tr("Download path")
+            text: Config.options.wallpapers.paths.download
+            wrapMode: TextEdit.Wrap
+            onTextChanged: {
+                Config.options.wallpapers.paths.download = text;
+            }
+        }
+    }
+
+    // There's no update indicator in ii for now so we shouldn't show this yet
+    // ContentSection {
+    //     icon: "deployed_code_update"
+    //     title: Translation.tr("System updates (Arch only)")
+
+    //     ConfigSwitch {
+    //         text: Translation.tr("Enable update checks")
+    //         checked: Config.options.updates.enableCheck
+    //         onCheckedChanged: {
+    //             Config.options.updates.enableCheck = checked;
+    //         }
+    //     }
+
+    //     ConfigSpinBox {
+    //         icon: "av_timer"
+    //         text: Translation.tr("Check interval (mins)")
+    //         value: Config.options.updates.checkInterval
+    //         from: 60
+    //         to: 1440
+    //         stepSize: 60
+    //         onValueChanged: {
+    //             Config.options.updates.checkInterval = value;
+    //         }
+    //     }
+    // }
 
     ContentSection {
         icon: "weather_mix"

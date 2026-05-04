@@ -9,7 +9,14 @@ import qs.modules.common.widgets
 import qs.modules.common.functions
 
 ContentPage {
+    id: page
+    readonly property int index: 0
+    property bool register: parent.register ?? false
     forceWidth: true
+    interactive: false
+
+    property bool allowHeavyLoad: false
+    Component.onCompleted: Qt.callLater(() => page.allowHeavyLoad = true)
 
     Process {
         id: randomWallProc
@@ -26,7 +33,7 @@ ContentPage {
     component SmallLightDarkPreferenceButton: RippleButton {
         id: smallLightDarkPreferenceButton
         required property bool dark
-        property color colText: toggled ? Appearance.colors.colOnPrimary : Appearance.colors.colOnLayer2
+        property color colText: enabled ? toggled ? Appearance.colors.colOnPrimary : Appearance.colors.colOnLayer2 : Appearance.colors.colOnLayer3
         padding: 5
         Layout.fillWidth: true
         toggled: Appearance.m3colors.darkmode === dark
@@ -34,15 +41,20 @@ ContentPage {
         onClicked: {
             Quickshell.execDetached(["bash", "-c", `${Directories.wallpaperSwitchScriptPath} --mode ${dark ? "dark" : "light"} --noswitch`]);
         }
+        StyledToolTip {
+            extraVisibleCondition: !smallLightDarkPreferenceButton.enabled
+            text: Translation.tr("Custom color scheme has been selected")
+        }
         contentItem: Item {
             anchors.centerIn: parent
-            ColumnLayout {
+            RowLayout {
                 anchors.centerIn: parent
-                spacing: 0
+                spacing: 10
                 MaterialSymbol {
                     Layout.alignment: Qt.AlignHCenter
                     iconSize: 30
                     text: dark ? "dark_mode" : "light_mode"
+                    fill: toggled ? 1 : 0
                     color: smallLightDarkPreferenceButton.colText
                 }
                 StyledText {
@@ -65,8 +77,8 @@ ContentPage {
             Layout.fillWidth: true
 
             Item {
-                implicitWidth: 340
-                implicitHeight: 200
+                implicitWidth: 360
+                implicitHeight: 220
                 
                 StyledImage {
                     id: wallpaperPreview
@@ -84,140 +96,148 @@ ContentPage {
                             radius: Appearance.rounding.normal
                         }
                     }
+                    RippleButton {
+                        anchors.fill: parent
+                        colBackground: "transparent"
+                        colBackgroundHover: ColorUtils.transparentize(Appearance.colors.colOnPrimary, 0.85)
+                        colRipple: ColorUtils.transparentize(Appearance.colors.colOnPrimary, 0.5)
+                        onClicked: {
+                            Quickshell.execDetached(`${Directories.wallpaperSwitchScriptPath}`);
+                        }
+                    }
+                    
+                }
+
+                MaterialSymbol {
+                    anchors.centerIn: parent
+                    text: "hourglass_top"
+                    color: Appearance.colors.colPrimary
+                    iconSize: 40
+                    z: -1
+                }
+
+                Rectangle {
+                    anchors {
+                        left: parent.left
+                        bottom: parent.bottom
+                        margins: 10
+                    }
+
+                    implicitWidth: Math.min(text.implicitWidth + 20, parent.width - 20)
+                    implicitHeight: text.implicitHeight + 5
+                    color: Appearance.colors.colPrimary
+                    radius: Appearance.rounding.full
+
+                    StyledText {
+                        id: text
+                        anchors.centerIn: parent
+                        property string fileName: Config.options.background.wallpaperPath.split("/")[Config.options.background.wallpaperPath.split("/").length - 1]
+                        text: fileName.length > 30 ? fileName.slice(27) + "..." : fileName
+                        color: Appearance.colors.colOnPrimary
+                        font.pixelSize: Appearance.font.pixelSize.smaller
+                    }
                 }
             }
 
+
             ColumnLayout {
-                RippleButtonWithIcon {
-                    enabled: !randomWallProc.running
-                    visible: Config.options.policies.weeb === 1
-                    Layout.fillWidth: true
-                    buttonRadius: Appearance.rounding.small
-                    materialIcon: "ifl"
-                    mainText: randomWallProc.running ? Translation.tr("Be patient...") : Translation.tr("Random: Konachan")
-                    onClicked: {
-                        randomWallProc.scriptPath = `${Directories.scriptPath}/colors/random/random_konachan_wall.sh`;
-                        randomWallProc.running = true;
-                    }
-                    StyledToolTip {
-                        text: Translation.tr("Random SFW Anime wallpaper from Konachan\nImage is saved to ~/Pictures/Wallpapers")
-                    }
-                }
-                RippleButtonWithIcon {
-                    enabled: !randomWallProc.running
-                    visible: Config.options.policies.weeb === 1
-                    Layout.fillWidth: true
-                    buttonRadius: Appearance.rounding.small
-                    materialIcon: "ifl"
-                    mainText: randomWallProc.running ? Translation.tr("Be patient...") : Translation.tr("Random: osu! seasonal")
-                    onClicked: {
-                        randomWallProc.scriptPath = `${Directories.scriptPath}/colors/random/random_osu_wall.sh`;
-                        randomWallProc.running = true;
-                    }
-                    StyledToolTip {
-                        text: Translation.tr("Random osu! seasonal background\nImage is saved to ~/Pictures/Wallpapers")
-                    }
-                }
-                RippleButtonWithIcon {
-                    Layout.fillWidth: true
-                    materialIcon: "wallpaper"
-                    StyledToolTip {
-                        text: Translation.tr("Pick wallpaper image on your system")
-                    }
-                    onClicked: {
-                        Quickshell.execDetached(`${Directories.wallpaperSwitchScriptPath}`);
-                    }
-                    mainContentComponent: Component {
-                        RowLayout {
-                            spacing: 10
-                            StyledText {
-                                font.pixelSize: Appearance.font.pixelSize.small
-                                text: Translation.tr("Choose file")
-                                color: Appearance.colors.colOnSecondaryContainer
-                            }
-                            RowLayout {
-                                spacing: 3
-                                KeyboardKey {
-                                    key: "Ctrl"
-                                }
-                                KeyboardKey {
-                                    key: Config.options.cheatsheet.superKey ?? "󰖳"
-                                }
-                                StyledText {
-                                    Layout.alignment: Qt.AlignVCenter
-                                    text: "+"
-                                }
-                                KeyboardKey {
-                                    key: "T"
-                                }
-                            }
-                        }
-                    }
-                }
+                Layout.fillHeight: true
+                Layout.fillWidth: true
+
                 RowLayout {
                     Layout.alignment: Qt.AlignHCenter
                     Layout.fillWidth: true
-                    Layout.fillHeight: true
+                    Layout.preferredHeight: 60
                     uniformCellSizes: true
 
                     SmallLightDarkPreferenceButton {
-                        Layout.fillHeight: true
+                        Layout.preferredHeight: 60
                         dark: false
+                        enabled: Config.options.appearance.palette.type.startsWith("scheme")
                     }
                     SmallLightDarkPreferenceButton {
-                        Layout.fillHeight: true
+                        Layout.preferredHeight: 60
                         dark: true
+                        enabled: Config.options.appearance.palette.type.startsWith("scheme")
                     }
                 }
-            }
-        }
+                
+                
 
-        ConfigSelectionArray {
-            currentValue: Config.options.appearance.palette.type
-            onSelected: newValue => {
-                Config.options.appearance.palette.type = newValue;
-                Quickshell.execDetached(["bash", "-c", `${Directories.wallpaperSwitchScriptPath} --noswitch`]);
-            }
-            options: [
-                {
-                    "value": "auto",
-                    "displayName": Translation.tr("Auto")
-                },
-                {
-                    "value": "scheme-content",
-                    "displayName": Translation.tr("Content")
-                },
-                {
-                    "value": "scheme-expressive",
-                    "displayName": Translation.tr("Expressive")
-                },
-                {
-                    "value": "scheme-fidelity",
-                    "displayName": Translation.tr("Fidelity")
-                },
-                {
-                    "value": "scheme-fruit-salad",
-                    "displayName": Translation.tr("Fruit Salad")
-                },
-                {
-                    "value": "scheme-monochrome",
-                    "displayName": Translation.tr("Monochrome")
-                },
-                {
-                    "value": "scheme-neutral",
-                    "displayName": Translation.tr("Neutral")
-                },
-                {
-                    "value": "scheme-rainbow",
-                    "displayName": Translation.tr("Rainbow")
-                },
-                {
-                    "value": "scheme-tonal-spot",
-                    "displayName": Translation.tr("Tonal Spot")
+                Item {
+                    id: colorGridItem
+                    z: 1
+                    Layout.fillHeight: true
+                    Layout.fillWidth: true
+                    
+                    StyledFlickable {
+                        id: flickable
+                        anchors.fill: parent
+                        contentHeight: contentLayout.implicitHeight
+                        contentWidth: width
+                        clip: true
+
+                        ColumnLayout {
+                            id: contentLayout
+                            width: flickable.width
+
+                            Repeater {
+                                model: [
+                                    { customTheme: false, builtInTheme: false },
+                                    { customTheme: false, builtInTheme: true },
+                                    { customTheme: true, builtInTheme: false }
+                                ]
+                                
+                                delegate: ColorPreviewGrid {
+                                    customTheme: modelData.customTheme
+                                    builtInTheme: modelData.builtInTheme
+                                }
+                            }
+
+                        }
+                    }
                 }
-            ]
+
+                
+            }
         }
 
+    
+        ConfigRow {
+            uniform: true
+            Layout.fillWidth: true
+            
+            RippleButtonWithIcon {
+                enabled: !randomWallProc.running
+                visible: Config.options.policies.weeb === 1
+                Layout.fillWidth: true
+                buttonRadius: Appearance.rounding.small
+                materialIcon: "ifl"
+                mainText: randomWallProc.running ? Translation.tr("Be patient...") : Translation.tr("Random: Konachan")
+                onClicked: {
+                    randomWallProc.scriptPath = `${Directories.scriptPath}/colors/random/random_konachan_wall.sh`;
+                    randomWallProc.running = true;
+                }
+                StyledToolTip {
+                    text: Translation.tr("Random SFW Anime wallpaper from Konachan\nImage is saved to ~/Pictures/Wallpapers")
+                }
+            }
+            RippleButtonWithIcon {
+                enabled: !randomWallProc.running
+                visible: Config.options.policies.weeb === 1
+                Layout.fillWidth: true
+                buttonRadius: Appearance.rounding.small
+                materialIcon: "ifl"
+                mainText: randomWallProc.running ? Translation.tr("Be patient...") : Translation.tr("Random: osu! seasonal")
+                onClicked: {
+                    randomWallProc.scriptPath = `${Directories.scriptPath}/colors/random/random_osu_wall.sh`;
+                    randomWallProc.running = true;
+                }
+                StyledToolTip {
+                    text: Translation.tr("Random osu! seasonal background\nImage is saved to ~/Pictures/Wallpapers")
+                }
+            }
+        }
         ConfigSwitch {
             buttonIcon: "ev_shadow"
             text: Translation.tr("Transparency")
@@ -226,15 +246,22 @@ ContentPage {
                 Config.options.appearance.transparency.enable = checked;
             }
         }
+        
     }
+
+    
 
     ContentSection {
         icon: "screenshot_monitor"
         title: Translation.tr("Bar & screen")
+        Layout.topMargin: -25
+
+        
 
         ConfigRow {
             ContentSubsection {
                 title: Translation.tr("Bar position")
+                Layout.fillWidth: true
                 ConfigSelectionArray {
                     currentValue: (Config.options.bar.bottom ? 1 : 0) | (Config.options.bar.vertical ? 2 : 0)
                     onSelected: newValue => {
@@ -267,6 +294,7 @@ ContentPage {
             }
             ContentSubsection {
                 title: Translation.tr("Bar style")
+                Layout.fillWidth: false
 
                 ConfigSelectionArray {
                     currentValue: Config.options.bar.cornerStyle
@@ -297,6 +325,7 @@ ContentPage {
         ConfigRow {
             ContentSubsection {
                 title: Translation.tr("Screen round corner")
+                Layout.fillWidth: true
 
                 ConfigSelectionArray {
                     currentValue: Config.options.appearance.fakeScreenRounding
@@ -315,28 +344,131 @@ ContentPage {
                             value: 1
                         },
                         {
-                            displayName: Translation.tr("When not fullscreen"),
+                            displayName: Translation.tr("Not fullscreen"),
                             icon: "fullscreen_exit",
                             value: 2
+                        },
+                        {
+                            displayName: Translation.tr("Wrapped"),
+                            icon: "capture",
+                            value: 3
+                        }
+                    ]
+                }
+            }
+
+            ContentSubsection {
+                title: Translation.tr("Rounding style")
+                Layout.fillWidth: false
+
+                ConfigSelectionArray {
+                    currentValue: Config.options.appearance.sharpMode
+                    onSelected: newValue => {
+                        Config.options.appearance.sharpMode = newValue;
+                        HyprlandSettings.setRounding(newValue ? 0 : Config.options.appearance.defaultBorderRadius);
+                    }
+                    options: [ 
+                        {
+                            displayName: Translation.tr("Default"),
+                            icon: "rounded_corner",
+                            value: false
+                        }, 
+                        {
+                            displayName: Translation.tr("Sharp"),
+                            icon: "square",
+                            value: true
+                        }
+                    ]
+                }
+            } 
+        }
+
+        ConfigSpinBox {
+            visible: Config.options.appearance.fakeScreenRounding === 3
+            icon: "line_weight"
+            text: Translation.tr("Wrapped frame thickness")
+            value: Config.options.appearance.wrappedFrameThickness
+            from: 5
+            to: 25
+            stepSize: 1
+            onValueChanged: {
+                Config.options.appearance.wrappedFrameThickness = value;
+            }
+        }
+
+        ConfigRow {
+            ContentSubsection {
+                title: Translation.tr("Bar background style")
+                Layout.fillWidth: true
+
+                ConfigSelectionArray {
+                    currentValue: Config.options.bar.barBackgroundStyle
+                    onSelected: newValue => {
+                        Config.options.bar.barBackgroundStyle = newValue;
+                    }
+                    options: [ 
+                        {
+                            displayName: Translation.tr("Visible"),
+                            icon: "visibility",
+                            value: 1
+                        }, 
+                        {
+                            displayName: Translation.tr("Adaptive"),
+                            icon: "masked_transitions",
+                            value: 2
+                        },        
+                        {
+                            displayName: Translation.tr("Transparent"),
+                            icon: "opacity",
+                            value: 0
                         }
                     ]
                 }
             }
             
+            ContentSubsection {
+                title: Translation.tr("Hyprland layout")
+                Layout.fillWidth: false
+
+                ConfigSelectionArray {
+                    currentValue: {
+                        if (Persistent.states.hyprland.layout !== "scrolling") return "default"
+                        else return "scrolling"
+                    }
+                    onSelected: newValue => {
+                        console.log(newValue)
+                        if (newValue === "scrolling") {
+                            HyprlandSettings.setLayout("scrolling")
+                        } else {
+                            const defaultLayout = Config.options.hyprland.defaultHyprlandLayout
+                            HyprlandSettings.setLayout(defaultLayout)
+                        }
+                    }
+                    options: [ 
+                        {
+                            displayName: Translation.tr("Default"),
+                            icon: "mobile_layout",
+                            value: "default"
+                        }, 
+                        {
+                            displayName: Translation.tr("Scrolling"),
+                            icon: "view_carousel",
+                            value: "scrolling"
+                        }
+                    ]
+                }
+            }                          
         }
-    }
+    }    
 
     NoticeBox {
         Layout.fillWidth: true
-        text: Translation.tr('Not all options are available in this app. You should also check the config file by hitting the "Config file" button on the topleft corner or opening %1 manually.').arg(Directories.shellConfigPath)
+        Layout.topMargin: -20
+        text: Translation.tr('Not all options are available in this app. You should also check the config file by hitting the "Config file" button on the topleft corner or opening ~/.config/illogical-impulse/config.json manually.')
 
-        Item {
-            Layout.fillWidth: true
-        }
         RippleButtonWithIcon {
             id: copyPathButton
             property bool justCopied: false
-            Layout.fillWidth: false
             buttonRadius: Appearance.rounding.small
             materialIcon: justCopied ? "check" : "content_copy"
             mainText: justCopied ? Translation.tr("Path copied") : Translation.tr("Copy path")

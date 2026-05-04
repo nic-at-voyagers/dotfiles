@@ -20,8 +20,16 @@ Item {
 
     property list<var> pinnedItems: TrayService.pinnedItems
     property list<var> unpinnedItems: TrayService.unpinnedItems
-    onUnpinnedItemsChanged: {
-        if (unpinnedItems.length == 0) root.closeOverflowMenu();
+    onPinnedItemsChanged: updateVisibility()
+    onUnpinnedItemsChanged: updateVisibility()
+
+    function updateVisibility() {
+        const hasAnyItems = pinnedItems.length > 0 || unpinnedItems.length > 0;
+        rootItem.toggleVisible(hasAnyItems);
+
+        if (unpinnedItems.length === 0) {
+            root.closeOverflowMenu();
+        }
     }
 
     function grabFocus() {
@@ -29,6 +37,11 @@ Item {
     }
 
     function setExtraWindowAndGrabFocus(window) {
+        if (root.activeMenu && root.activeMenu !== window) {
+            if (typeof root.activeMenu.close === "function")
+                root.activeMenu.close();
+            root.activeMenu = null;
+        }
         root.activeMenu = window;
         root.grabFocus();
     }
@@ -139,14 +152,6 @@ Item {
                     root.setExtraWindowAndGrabFocus(qsWindow);
                 }
             }
-        }
-
-        StyledText {
-            Layout.alignment: Qt.AlignVCenter | Qt.AlignHCenter
-            font.pixelSize: Appearance.font.pixelSize.larger
-            color: Appearance.colors.colSubtext
-            text: "•"
-            visible: root.showSeparator && SystemTray.items.values.length > 0
         }
     }
 }

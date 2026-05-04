@@ -16,22 +16,35 @@ import qs.modules.common
  */
 Singleton {
 	id: root;
+	property list<MprisPlayer> allPlayers: Mpris.players.values;
 	property list<MprisPlayer> players: Mpris.players.values.filter(player => isRealPlayer(player));
 	property MprisPlayer trackedPlayer: null;
 	property MprisPlayer activePlayer: trackedPlayer ?? Mpris.players.values[0] ?? null;
 	signal trackChanged(reverse: bool);
 
+	property string priorityPlayer: Config.options.media.priorityPlayer;
+
 	property bool __reverse: false;
 
 	property var activeTrack;
 
-	property bool hasPlasmaIntegration: false
+	onAllPlayersChanged: {
+		const nextPlayer = allPlayers.find(player => player.desktopEntry === root.priorityPlayer);
+		if (nextPlayer) {
+			activePlayer = nextPlayer;
+			return;
+		} else {
+			activePlayer = players[0];
+		}
+	}
+
+	property bool hasActivePlasmaIntegration: false
     Process {
         id: plasmaIntegrationAvailabilityCheckProc
         running: true
         command: ["bash", "-c", "command -v plasma-browser-integration-host"]
         onExited: (exitCode, exitStatus) => {
-            root.hasPlasmaIntegration = (exitCode === 0);
+            root.hasActivePlasmaIntegration = (exitCode === 0);
         }
     }
 	function isRealPlayer(player) {
@@ -39,8 +52,8 @@ Singleton {
             return true;
         }
         return (
-            // Remove unecessary native buses from browsers if there's plasma integration
-            !(hasPlasmaIntegration && player.dbusName.startsWith('org.mpris.MediaPlayer2.firefox')) && !(hasPlasmaIntegration && player.dbusName.startsWith('org.mpris.MediaPlayer2.chromium')) &&
+            // Remove native browser buses only if plasma-browser-integration is actually active on D-Bus
+            !(root.hasActivePlasmaIntegration && player.dbusName.startsWith('org.mpris.MediaPlayer2.firefox')) && !(root.hasActivePlasmaIntegration && player.dbusName.startsWith('org.mpris.MediaPlayer2.chromium')) &&
             // playerctld just copies other buses and we don't need duplicates
             !player.dbusName?.startsWith('org.mpris.MediaPlayer2.playerctld') &&
             // Non-instance mpd bus
@@ -103,7 +116,9 @@ Singleton {
 		}
 	}
 
-	onActivePlayerChanged: this.updateTrack();
+	onActivePlayerChanged: {
+		this.updateTrack();
+	}
 
 	function updateTrack() {
 		//console.log(`update: ${this.activePlayer?.trackTitle ?? ""} : ${this.activePlayer?.trackArtists}`)

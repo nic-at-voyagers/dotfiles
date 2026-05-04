@@ -1,3 +1,4 @@
+pragma ComponentBehavior: Bound
 import QtQuick
 import Quickshell
 import Quickshell.Services.SystemTray
@@ -18,6 +19,7 @@ MouseArea {
 
     hoverEnabled: true
     acceptedButtons: Qt.LeftButton | Qt.RightButton
+    cursorShape: Qt.PointingHandCursor
     implicitWidth: 20
     implicitHeight: 20
     onPressed: (event) => {
@@ -26,7 +28,11 @@ MouseArea {
             item.activate();
             break;
         case Qt.RightButton:
-            if (item.hasMenu) menu.open();
+            if (item.hasMenu)
+                if (menu.active && menu.item && typeof menu.item.close === "function")
+                    menu.item.close();
+                else 
+                    menu.open();
             break;
         }
         event.accepted = true;
@@ -37,22 +43,55 @@ MouseArea {
 
     Loader {
         id: menu
-        function open() {
-            menu.active = true;
-        }
+        function open() { menu.active = true; }
         active: false
+
         sourceComponent: SysTrayMenu {
             Component.onCompleted: this.open();
             trayItemMenuHandle: root.item.menu
+            trayItemId: root.item.id
+            
             anchor {
                 window: root.QsWindow.window
-                rect.x: root.x + (Config.options.bar.vertical ? 0 : QsWindow.window?.width)
-                rect.y: root.y + (Config.options.bar.vertical ? QsWindow.window?.height : 0)
-                rect.height: root.height
-                rect.width: root.width
-                edges: Config.options.bar.bottom ? (Edges.Top | Edges.Left) : (Edges.Bottom | Edges.Right)
-                gravity: Config.options.bar.bottom ? (Edges.Top | Edges.Left) : (Edges.Bottom | Edges.Right)
+                
+                rect: {
+                    var gap = Appearance.sizes.elevationMargin; // SysTrayItem menu gap
+                    var pos = root.mapToItem(null, 0, 0); 
+                    
+                    if (Config.options.bar.vertical) {
+                        return Qt.rect(
+                            Config.options.bar.bottom ? pos.x - gap : pos.x + gap, 
+                            pos.y, 
+                            root.width, 
+                            root.height
+                        );
+                    } else {
+                        return Qt.rect(
+                            pos.x, 
+                            Config.options.bar.bottom ? pos.y - gap : pos.y + gap, 
+                            root.width, 
+                            root.height
+                        );
+                    }
+                }
+
+                edges: {
+                    if (Config.options.bar.vertical) {
+                        return Config.options.bar.bottom ? (Edges.Left | Edges.Middle) : (Edges.Right | Edges.Middle);
+                    } else {
+                        return Config.options.bar.bottom ? (Edges.Top | Edges.Center) : (Edges.Bottom | Edges.Center);
+                    }
+                }
+                
+                gravity: {
+                    if (Config.options.bar.vertical) {
+                        return Config.options.bar.bottom ? Edges.Left : Edges.Right;
+                    } else {
+                        return Config.options.bar.bottom ? Edges.Top : Edges.Bottom;
+                    }
+                }
             }
+
             onMenuOpened: (window) => root.menuOpened(window);
             onMenuClosed: {
                 root.menuClosed();
@@ -60,6 +99,7 @@ MouseArea {
             }
         }
     }
+
 
     IconImage {
         id: trayIcon

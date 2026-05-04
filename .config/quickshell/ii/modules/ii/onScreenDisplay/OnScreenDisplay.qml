@@ -25,6 +25,14 @@ Scope {
             id: "brightness",
             sourceUrl: "indicators/BrightnessIndicator.qml"
         },
+        {
+            id: "playerVolume",
+            sourceUrl: "indicators/PlayerVolumeIndicator.qml"
+        },
+        {
+            id: "gamma",
+            sourceUrl: "indicators/GammaIndicator.qml"
+        },
     ]
 
     function triggerOsd() {
@@ -53,6 +61,15 @@ Scope {
     }
 
     Connections {
+        target: Hyprsunset
+        function onGammaChangeAttempt() {
+            root.protectionMessage = "";
+            root.currentIndicator = "gamma";
+            root.triggerOsd();
+        }
+    }
+
+    Connections {
         // Listen to volume changes
         target: Audio.sink?.audio ?? null
         function onVolumeChanged() {
@@ -76,6 +93,17 @@ Scope {
             root.protectionMessage = reason;
             root.currentIndicator = "volume";
             root.triggerOsd();
+        }
+    }
+
+    Connections {
+        // Listen to MPRIS/MPD media player volume changes
+        target: MprisController.activePlayer ?? null
+        function onVolumeChanged() {
+            if (MprisController.canChangeVolume) {
+                root.currentIndicator = "playerVolume";
+                root.triggerOsd();
+            }
         }
     }
 

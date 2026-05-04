@@ -45,7 +45,17 @@ AbstractWidget {
     property bool dominantColorIsDark: dominantColor.hslLightness < 0.5
     property color colText: {
         const onNormalBackground = (GlobalStates.screenLocked && Config.options.lock.blur.enable)
-        const adaptiveColor = ColorUtils.colorWithLightness(Appearance.colors.colPrimary, (dominantColorIsDark ? 0.8 : 0.72))
+        const adaptiveColor = ColorUtils.colorWithLightness(Appearance.colors.colPrimary, (dominantColorIsDark ? 0.8 : 0.12))
+        return onNormalBackground ? Appearance.colors.colOnLayer0 : adaptiveColor;
+    }
+    property color colTextSecondary: {
+        const onNormalBackground = (GlobalStates.screenLocked && Config.options.lock.blur.enable)
+        const adaptiveColor = ColorUtils.colorWithLightness(Appearance.colors.colSecondary, (dominantColorIsDark ? 0.8 : 0.12))
+        return onNormalBackground ? Appearance.colors.colOnLayer0 : adaptiveColor;
+    }
+    property color colTextTertiary: {
+        const onNormalBackground = (GlobalStates.screenLocked && Config.options.lock.blur.enable)
+        const adaptiveColor = ColorUtils.colorWithLightness(Appearance.colors.colTertiary, (dominantColorIsDark ? 0.8 : 0.12))
         return onNormalBackground ? Appearance.colors.colOnLayer0 : adaptiveColor;
     }
 
