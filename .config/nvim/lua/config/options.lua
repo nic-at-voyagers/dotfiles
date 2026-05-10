@@ -2,8 +2,9 @@
 -- Default options that are always set: https://github.com/LazyVim/LazyVim/blob/main/lua/lazyvim/config/options.lua
 -- Add any additional options here
 vim.opt.relativenumber = false
-vim.g.lazyvim_cmp = "blink"
+vim.g.lazyvim_cmp = "blink.cmp"
 vim.g.autoformat = false
 vim.opt.tabstop = 6
 vim.opt.shiftwidth = 6
-
+vim.opt.expandtab = true
+vim.g.lazyvim_python_lsp = "basedpyright"

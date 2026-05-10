@@ -50,7 +50,7 @@
             "type": "scheme-fruit-salad"
         },
         "sharpMode": false,
-        "toggleWindowRounding": true,
+        "toggleWindowRounding": false,
         "transparency": {
             "automatic": false,
             "backgroundTransparency": 0.25,
@@ -98,7 +98,7 @@
                 "speedScale": 10
             },
             "backgroundBlurRadius": 120,
-            "backgroundOpacity": 50,
+            "backgroundOpacity": 40,
             "backgroundShape": "Cookie12Sided",
             "changeShellColor": false,
             "enableBackgroundAnimation": true,
@@ -159,8 +159,8 @@
                 "showOnlyWhenLocked": false,
                 "style": "digital",
                 "styleLocked": "cookie",
-                "x": 807.9609375,
-                "y": 66.1640625
+                "x": 785.342717097356,
+                "y": 58.29600485777243
             },
             "media": {
                 "backgroundShape": "Circle",
@@ -207,7 +207,7 @@
         "barBackgroundStyle": 0,
         "barGroupStyle": 2,
         "bottom": false,
-        "cornerStyle": 2,
+        "cornerStyle": 0,
         "floatStyleShadow": true,
         "indicators": {
             "notifications": {
@@ -219,6 +219,11 @@
         },
         "layouts": {
             "center": [
+                {
+                    "centered": false,
+                    "id": "system_monitor",
+                    "visible": true
+                },
                 {
                     "centered": false,
                     "id": "music_player",
@@ -236,7 +241,7 @@
                 },
                 {
                     "centered": false,
-                    "id": "system_monitor",
+                    "id": "utility_buttons",
                     "visible": true
                 }
             ],
@@ -292,7 +297,7 @@
             "customSize": 250,
             "lyrics": {
                 "customSize": 400,
-                "enable": true,
+                "enable": false,
                 "style": "scroller",
                 "useGradientMask": true
             },
@@ -317,7 +322,7 @@
         "tooltips": {
             "clickToShow": false,
             "compactPopups": false,
-            "showSwap": false
+            "showSwap": true
         },
         "topLeftIcon": "spark",
         "utilButtons": {
@@ -335,7 +340,7 @@
             "city": "Dinh Ca",
             "enable": true,
             "enableGPS": false,
-            "fetchInterval": 30,
+            "fetchInterval": 50,
             "useUSCS": false
         },
         "workspaces": {
@@ -582,7 +587,7 @@
     },
     "resources": {
         "historyLength": 60,
-        "updateInterval": 3000
+        "updateInterval": 10000
     },
     "screenRecord": {
         "savePath": "/home/nic/Videos"
