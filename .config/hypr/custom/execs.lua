@@ -1,0 +1,6 @@
+hl.on("hyprland.start", function ()
+      hl.exec_cmd("~/Documents/scripts/splash.sh")
+      hl.exec_cmd("hyprctl setcursor Breeze_Light 24")
+      hl.exec_cmd("kdeconnectd")
+      hl.exec_cmd("arrpc")
+end)
