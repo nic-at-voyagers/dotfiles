@@ -66,11 +66,11 @@ body {
   --colors: on; /* turn off to use discord default colors */
   /* text colors */
   --text-0: #0d4845; /* text on colored elements */
-  --text-1: rgb(223.5, 234.3, 232.5); /* bright text on colored elements */
-  --text-2: rgb(221.75, 233.15, 231.25); /* headings and important text */
+  --text-1: #c6d0f5; /* bright text on colored elements */
+  --text-2: #cad3f5; /* headings and important text */
   --text-3: #cdd6f4; /* normal text */
-  --text-4: #bac2de; /* icon buttons and channels */
-  --text-5: #bac2de; /* muted channels/chats and timestamps */
+  --text-4: #9399b2; /* icon buttons and channels */
+  --text-5: #6c7086; /* muted channels/chats and timestamps */
   /* background and dark colors */
   --bg-1: #1d2827; /* dark buttons when clicked */
   --bg-2: #192120; /* dark buttons */
