@@ -17,7 +17,7 @@ hl.config({
         allow_tearing = true, -- This just allows the `immediate` window rule to work
         snap = {
             enabled = true,
-            window_gap = 4,
+            window_gap = 10,
             monitor_gap = 5,
             respect_gaps = true
         }
@@ -29,7 +29,7 @@ hl.config({
         rounding = 0,
 
         blur = {
-            enabled = true,
+            enabled = false,
             xray = true,
             special = false,
             new_optimizations = true,

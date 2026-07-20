@@ -2,6 +2,7 @@ import qs
 import qs.services
 import qs.modules.common
 import qs.modules.common.widgets
+import qs.modules.common.widgets.animations
 import qs.modules.common.functions
 import qs.modules.ii.sidebarPolicies.aiChat
 import QtQuick
@@ -375,15 +376,15 @@ Inline w/ backslash and round brackets \\(e^{i\\pi} + 1 = 0\\)
                 mouseScrollFactor: Config.options.interactions.scrolling.mouseScrollFactor * 1.4
 
                 property int lastResponseLength: 0
-                onContentHeightChanged: {
-                    if (atYEnd)
-                        Qt.callLater(positionViewAtEnd);
-                }
-                onCountChanged: {
-                    // Auto-scroll when new messages are added
-                    if (atYEnd)
-                        Qt.callLater(positionViewAtEnd);
-                }
+                // onContentHeightChanged: {
+                //     if (atYEnd)
+                //         Qt.callLater(positionViewAtEnd);
+                // }
+                // onCountChanged: {
+                //     // Auto-scroll when new messages are added
+                //     if (atYEnd)
+                //         Qt.callLater(positionViewAtEnd);
+                // }
 
                 add: null // Prevent function calls from being janky
 
@@ -405,12 +406,35 @@ Inline w/ backslash and round brackets \\(e^{i\\pi} + 1 = 0\\)
             }
 
             PagePlaceholder {
+                id: placeholder
                 z: 2
                 shown: Ai.messageIDs.length === 0
                 icon: "neurology"
                 title: Translation.tr("Large language models")
                 description: Translation.tr("Type /key to get started with online models\nCtrl+O to expand sidebar\nCtrl+P to pin sidebar\nCtrl+D to detach sidebar")
                 shape: MaterialShape.Shape.PixelCircle
+
+                TriggerAnimation {
+                    trigger: GlobalStates.policiesPanelOpen
+                    animation: ParallelAnimation {
+                        
+                        PropertyAnimation {
+                            target: placeholder.iconWidget
+                            property: "rotation"
+                            from: -80
+                            to: 0
+                            duration: 250
+                            easing.type: Easing.OutCubic
+                        }
+
+                        BounceAnimation {
+                            target: placeholder.iconWidget
+                            propertyName: "scale"
+                            peak: 1.1
+                            totalDuration: 400 // more than the above animation on purpose
+                        }
+                    }
+                }
             }
 
             ScrollToBottomButton {

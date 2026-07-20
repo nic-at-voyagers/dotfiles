@@ -17,6 +17,7 @@ Item {
     required property int index
     property var originalIndex: index
     property bool vertical: false
+    property bool highlighted: false
 
     implicitWidth: wrapper.implicitWidth
     implicitHeight: wrapper.implicitHeight
@@ -26,6 +27,10 @@ Item {
         if (barSection == 0) Config.options.bar.layouts.left[originalIndex].visible = visibility
         else if (barSection == 1) Config.options.bar.layouts.center[originalIndex].visible = visibility
         else if (barSection == 2) Config.options.bar.layouts.right[originalIndex].visible = visibility
+    }
+
+    function toggleHighlight(highlight) {
+        rootItem.highlighted = highlight
     }
 
     property var compMap: ({ // [horizontal, vertical]
@@ -43,10 +48,9 @@ Item {
         "timer": [timerComp, timerCompVert],
         "weather": [weatherComp, weatherComp],
         "policies_panel_button": [policiesPanelButton, policiesPanelButton],
-        "dashboard_panel_button": [dashboardPanelButton, dashboardPanelButtonVert]
+        "dashboard_panel_button": [dashboardPanelButton, dashboardPanelButtonVert],
+        "network_speed": [networkSpeedComp, networkSpeedComp],
     })
-
-    property list<string> primaryBackgroundComps: ["timer", "record_indicator", "screen_share_indicator"] // components that are mostly indicators
 
     property real startRadius: {
         if (barSection === 0) {
@@ -95,12 +99,34 @@ Item {
         
         startRadius: rootItem.startRadius
         endRadius: rootItem.endRadius
-        colBackground: primaryBackgroundComps.includes(modelData.id) ? rootItem.colBackgroundHighlight : rootItem.colBackground
+        colBackground: rootItem.highlighted ? rootItem.colBackgroundHighlight : rootItem.colBackground
+
+        readonly property var _currentComp: {
+            BarComponentRegistry._extensionCompVersion
+            let builtin = compMap[modelData.id]
+            if (builtin) return builtin[vertical ? 1 : 0]
+            return BarComponentRegistry.getComponentForId(modelData.id, vertical)
+        }
 
         Loader {
             id: itemLoader
             active: true
-            sourceComponent: compMap[modelData.id][vertical ? 1 : 0]
+            sourceComponent: wrapper._currentComp
+            onLoaded: {
+                let extId = BarComponentRegistry.getExtensionIdForComponent(modelData.id)
+                if (extId && item) {
+                    if ("extensionId" in item) {
+                        item.extensionId = extId
+                    } else {
+                        Object.defineProperty(item, "extensionId", {
+                            value: extId,
+                            writable: true,
+                            configurable: true,
+                            enumerable: true
+                        })
+                    }
+                }
+            }
         }
     }
 
@@ -139,5 +165,6 @@ Item {
     Component { id: policiesPanelButton; PoliciesPanelButton {} }
     
     Component { id: dashboardPanelButton; DashboardPanelButton {} }
+    Component { id: networkSpeedComp; NetworkSpeed { vertical: rootItem.vertical } }
     Component { id: dashboardPanelButtonVert; VerticalDashboardPanelButton {} }
 }

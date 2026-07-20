@@ -24,3 +24,6 @@ require("custom/keybinds")
 
 -- Shell overrides --
 require("hyprland/shellOverrides/main")
+
+-- hyprmon: managed monitor profile include
+require("hyprmon")

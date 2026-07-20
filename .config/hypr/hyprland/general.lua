@@ -47,9 +47,9 @@ hl.config({
     },
     general = {
         -- Gaps and border
-        gaps_in = 4,
-        gaps_out = 5,
-        gaps_workspaces = 50,
+        gaps_in = 10,
+        gaps_out = 15,
+        gaps_workspaces = 100,
 
         border_size = 1,
 
@@ -63,7 +63,7 @@ hl.config({
         allow_tearing = true, -- This just allows the `immediate` window rule to work
         snap = {
             enabled = true,
-            window_gap = 4,
+            window_gap = 10,
             monitor_gap = 5,
             respect_gaps = true
         }
@@ -129,11 +129,11 @@ hl.curve("expressiveDefaultSpatial", {
 })
 hl.curve("emphasizedDecel", {
     type = "bezier",
-    points = {{0.05, 0.7}, {0.1, 1}}
+    points = {{0.05, 0.8}, {0.1, 1}}
 })
 hl.curve("emphasizedAccel", {
     type = "bezier",
-    points = {{0.3, 0}, {0.8, 0.15}}
+    points = {{0.3, 0}, {0.9, 0.15}}
 })
 hl.curve("standardDecel", {
     type = "bezier",
@@ -141,7 +141,7 @@ hl.curve("standardDecel", {
 })
 hl.curve("menu_decel", {
     type = "bezier",
-    points = {{0.1, 1}, {0, 1}}
+    points = {{0.01, 1}, {0, 1}}
 })
 hl.curve("menu_accel", {
     type = "bezier",
@@ -182,7 +182,7 @@ hl.animation({
 hl.animation({
     leaf = "windowsMove",
     enabled = true,
-    speed = 3,
+    speed = 2,
     bezier = "emphasizedDecel",
     style = "slide"
 })
@@ -197,14 +197,14 @@ hl.animation({
 hl.animation({
     leaf = "layersIn",
     enabled = true,
-    speed = 2.7,
+    speed = 3.7,
     bezier = "emphasizedDecel",
     style = "popin 93%"
 })
 hl.animation({
     leaf = "layersOut",
     enabled = true,
-    speed = 2.4,
+    speed = 3.4,
     bezier = "menu_accel",
     style = "popin 94%"
 })
@@ -225,7 +225,7 @@ hl.animation({
 hl.animation({
     leaf = "workspaces",
     enabled = true,
-    speed = 7,
+    speed = 1,
     bezier = "menu_decel",
     style = "slide"
 })
@@ -247,7 +247,7 @@ hl.animation({
 -- zoom
 hl.animation({
     leaf = "zoomFactor",
-    enabled = true,
+    enabled = false,
     speed = 3,
     bezier = "standardDecel"
 })
