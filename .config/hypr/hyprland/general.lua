@@ -141,7 +141,7 @@ hl.curve("standardDecel", {
 })
 hl.curve("menu_decel", {
     type = "bezier",
-    points = {{0.01, 1}, {0, 1}}
+    points = {{0, 1.1}, {0, 1}}
 })
 hl.curve("menu_accel", {
     type = "bezier",
