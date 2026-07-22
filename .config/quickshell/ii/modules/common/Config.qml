@@ -219,6 +219,7 @@ Singleton {
                             property bool hourMarks: false
                             property bool dateInClock: true
                             property bool constantlyRotate: false
+                            property bool turnOffRotationOnTiledApps: false
                         }
                         property JsonObject digital: JsonObject {
                             property bool adaptiveAlignment: true
@@ -497,7 +498,7 @@ Singleton {
                 property real hoverRegionHeight: 2
                 property bool pinnedOnStartup: false
                 property bool enablePreview: true
-                property bool hoverToReveal: true
+                property bool revealOnEmptyWorkspace: true
                 property bool enableMediaWidget: false
                 property string position: "bottom"
                 property list<string> pinnedApps: ["org.kde.dolphin", "kitty",]
