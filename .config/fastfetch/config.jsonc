@@ -36,7 +36,7 @@
             },
             {
                   "type": "packages",
-                  "format": "{} (pacman)",
+                  "disabled": ["flatpak"],
                   "key": "     ",
                   "keyColor": "cyan"
             },
