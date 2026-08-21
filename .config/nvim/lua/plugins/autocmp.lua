@@ -2,11 +2,14 @@ return {
   "saghen/blink.cmp",
   -- Make blink.cmp toogleable
   opts = function(_, opts)
-    vim.b.completion = false
+    vim.g.completion = false
 
     Snacks.toggle({
       name = "Completion",
       get = function()
+        if vim.b.completion == nil then
+          return vim.g.completion
+        end
         return vim.b.completion
       end,
       set = function(state)
@@ -15,9 +18,12 @@ return {
     }):map("<leader>uk")
 
     opts.enabled = function()
-      return vim.b.completion ~= false
+      local state = vim.b.completion
+      if state == nil then
+        state = vim.g.completion
+      end
+      return state == true
     end
-
     return opts
   end,
 }
