@@ -93,3 +93,6 @@ end, { desc = "List Breakpoints", nowait = true, remap = false })
 vim.keymap.set("n", "<leader>de", function()
     require("dap").set_exception_breakpoints({ "all" })
 end, { desc = "Set Exception Breakpoints", nowait = true, remap = false })
+
+-- Delete trailing whitespace
+vim.keymap.set('n', '<S-F9>', ':%s/\\s\\+$//<CR>', { noremap = true })
