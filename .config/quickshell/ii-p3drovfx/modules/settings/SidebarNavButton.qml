@@ -1,7 +1,6 @@
 pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Layouts
-import Qt5Compat.GraphicalEffects
 import qs.modules.common
 import qs.modules.common.widgets
 
@@ -52,39 +51,14 @@ Item {
     implicitHeight: itemHeight
 
     // ── Radius helpers ─────────────────────────────────────────────────────
-    readonly property real _rFull:      itemHeight / 2
-    readonly property real _rTiny:      Appearance.rounding.verysmall
-
-    // Top corners
-    readonly property real _topLeftRadius: {
-        if (isActive || isPressed)        return _rFull;
-        if (prevIsActive || prevIsPressed)    return _rFull;  // Top of item below active (i.e. prev is active)
-        if (isFirst)         return _rFull;
-        return _rTiny;
-    }
-    readonly property real _topRightRadius: {
-        if (isActive || isPressed)        return _rFull;
-        if (prevIsActive || prevIsPressed)    return _rFull;
-        if (isFirst)         return _rFull;
-        return _rTiny;
-    }
-
-    // Bottom corners
-    readonly property real _bottomLeftRadius: {
-        if (isActive || isPressed)        return _rFull;
-        if (nextIsActive || nextIsPressed)    return _rFull;  // Bottom of item above active (i.e. next is active)
-        if (isLast)          return _rFull;
-        return _rTiny;
-    }
-    readonly property real _bottomRightRadius: {
-        if (isActive || isPressed)        return _rFull;
-        if (nextIsActive || nextIsPressed)    return _rFull;
-        if (isLast)          return _rFull;
-        return _rTiny;
-    }
+    readonly property real _rFull: itemHeight / 2
+    readonly property real _topLeftRadius: _rFull
+    readonly property real _topRightRadius: _rFull
+    readonly property real _bottomLeftRadius: _rFull
+    readonly property real _bottomRightRadius: _rFull
 
     // ── Signal ─────────────────────────────────────────────────────────────
-    signal clicked()
+    signal clicked
 
     // ── Background ─────────────────────────────────────────────────────────
     Rectangle {
@@ -92,41 +66,27 @@ Item {
         anchors.fill: parent
         antialiasing: true
 
-        topLeftRadius:     root._topLeftRadius
-        topRightRadius:    root._topRightRadius
-        bottomLeftRadius:  root._bottomLeftRadius
+        topLeftRadius: root._topLeftRadius
+        topRightRadius: root._topRightRadius
+        bottomLeftRadius: root._bottomLeftRadius
         bottomRightRadius: root._bottomRightRadius
 
-        color: isActive
-            ? (mouseArea.pressed
-                ? Appearance.colors.colPrimaryActive
-                : mouseArea.containsMouse
-                    ? Appearance.colors.colPrimaryHover
-                    : Appearance.colors.colPrimary)
-            : (mouseArea.pressed
-                ? Appearance.colors.colLayer2Active
-                : mouseArea.containsMouse
-                    ? Appearance.colors.colLayer2Hover
-                    : Appearance.colors.colLayer2)
+        color: isActive ? (mouseArea.pressed ? Appearance.colors.colPrimaryActive : mouseArea.containsMouse ? Appearance.colors.colPrimaryHover : Appearance.colors.colPrimary) : (mouseArea.pressed ? Appearance.colors.colLayer2Active : mouseArea.containsMouse ? Appearance.colors.colLayer2Hover : Appearance.colors.colLayer2)
 
-        Behavior on color            { animation: Appearance.animation.elementMoveFast.colorAnimation.createObject(btnBg) }
-        Behavior on topLeftRadius    { animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(btnBg) }
-        Behavior on topRightRadius   { animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(btnBg) }
-        Behavior on bottomLeftRadius { animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(btnBg) }
-        Behavior on bottomRightRadius{ animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(btnBg) }
-
-        // Clip content to rounded rect
-        layer.enabled: true
-        layer.smooth: true
-        layer.effect: OpacityMask {
-            maskSource: Rectangle {
-                width: btnBg.width; height: btnBg.height
-                topLeftRadius:     btnBg.topLeftRadius
-                topRightRadius:    btnBg.topRightRadius
-                bottomLeftRadius:  btnBg.bottomLeftRadius
-                bottomRightRadius: btnBg.bottomRightRadius
-                antialiasing: true
-            }
+        Behavior on color {
+            animation: Appearance.animation.elementMoveFast.colorAnimation.createObject(btnBg)
+        }
+        Behavior on topLeftRadius {
+            animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(btnBg)
+        }
+        Behavior on topRightRadius {
+            animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(btnBg)
+        }
+        Behavior on bottomLeftRadius {
+            animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(btnBg)
+        }
+        Behavior on bottomRightRadius {
+            animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(btnBg)
         }
     }
 
@@ -142,34 +102,33 @@ Item {
         // Circle icon container
         Rectangle {
             id: iconCircle
-            implicitWidth:  root.itemHeight - 8
+            implicitWidth: root.itemHeight - 8
             implicitHeight: root.itemHeight - 8
             radius: width / 2
             Layout.alignment: Qt.AlignVCenter
             Layout.leftMargin: 4
 
-            color: isActive
-                ? Qt.rgba(1, 1, 1, 0.18)
-                : Qt.rgba(
-                    Appearance.colors.colOnLayer2.r,
-                    Appearance.colors.colOnLayer2.g,
-                    Appearance.colors.colOnLayer2.b,
-                    0.10
-                  )
+            color: isActive ? Qt.rgba(1, 1, 1, 0.18) : Qt.rgba(Appearance.colors.colOnLayer2.r, Appearance.colors.colOnLayer2.g, Appearance.colors.colOnLayer2.b, 0.10)
 
-            Behavior on color { animation: Appearance.animation.elementMoveFast.colorAnimation.createObject(this) }
+            Behavior on color {
+                animation: Appearance.animation.elementMoveFast.colorAnimation.createObject(this)
+            }
 
             MaterialSymbol {
                 anchors.centerIn: parent
                 text: root.iconName
                 iconSize: 18
                 fill: isActive ? 1 : 0
-                color: isActive
-                    ? Appearance.colors.colOnPrimary
-                    : Appearance.colors.colOnLayer2
+                color: isActive ? Appearance.colors.colOnPrimary : Appearance.colors.colOnLayer2
 
-                Behavior on color { animation: Appearance.animation.elementMoveFast.colorAnimation.createObject(this) }
-                Behavior on fill  { NumberAnimation { duration: 150 } }
+                Behavior on color {
+                    animation: Appearance.animation.elementMoveFast.colorAnimation.createObject(this)
+                }
+                Behavior on fill {
+                    NumberAnimation {
+                        duration: 150
+                    }
+                }
             }
         }
 
@@ -180,11 +139,11 @@ Item {
             elide: Text.ElideRight
             font.pixelSize: Appearance.font.pixelSize.small
             font.weight: isActive ? Font.DemiBold : Font.Normal
-            color: isActive
-                ? Appearance.colors.colOnPrimary
-                : Appearance.colors.colOnLayer2
+            color: isActive ? Appearance.colors.colOnPrimary : Appearance.colors.colOnLayer2
 
-            Behavior on color { animation: Appearance.animation.elementMoveFast.colorAnimation.createObject(this) }
+            Behavior on color {
+                animation: Appearance.animation.elementMoveFast.colorAnimation.createObject(this)
+            }
         }
     }
 

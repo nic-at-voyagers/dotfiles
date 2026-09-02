@@ -18,11 +18,23 @@ Scope {
     Connections {
         target: HyprlandXkb
         function onCurrentLayoutNameChanged() {
-            if (root._prevLayout !== "" && root._prevLayout !== HyprlandXkb.currentLayoutName && HyprlandXkb.layoutCodes.length > 1 && Config.options.bar.tooltips.enableKeyboardLayoutTransitionPopup) {
+            if (root._prevLayout !== "" && root._prevLayout !== HyprlandXkb.currentLayoutName && HyprlandXkb.layoutCodes.length > 1 && Config.options.bar.tooltips.enablePopups && Config.options.bar.tooltips.enableKeyboardLayoutTransitionPopup) {
                 root.isOpen = true;
                 hideTimer.restart();
             }
             root._prevLayout = HyprlandXkb.currentLayoutName;
+        }
+    }
+
+    Connections {
+        target: Config.options.bar.tooltips
+        function onEnablePopupsChanged() {
+            if (!Config.options.bar.tooltips.enablePopups)
+                root.isOpen = false;
+        }
+        function onEnableKeyboardLayoutTransitionPopupChanged() {
+            if (!Config.options.bar.tooltips.enableKeyboardLayoutTransitionPopup)
+                root.isOpen = false;
         }
     }
 
@@ -36,48 +48,59 @@ Scope {
         }
     }
 
-    PanelWindow {
-        id: popupWindow
-        color: "transparent"
-        visible: Quickshell.screens.length > 0 && (root.isOpen || (popupContent ? popupContent.isExitAnimRunning : false))
-        screen: Quickshell.screens.find(s => s.name === Hyprland.focusedMonitor?.name) ?? Quickshell.screens[0] ?? null
+    LazyLoader {
+        active: (root.isOpen
+                && Config.options.bar.tooltips.enablePopups
+                && Config.options.bar.tooltips.enableKeyboardLayoutTransitionPopup)
+            || (typeof popupContent !== "undefined" && popupContent ? popupContent.isExitAnimRunning : false)
 
-        WlrLayershell.namespace: "quickshell:keyboardLayoutTransitionPopup"
-        WlrLayershell.layer: WlrLayer.Overlay
-        exclusionMode: ExclusionMode.Ignore
-        exclusiveZone: 0
+        component: PanelWindow {
+            id: popupWindow
+            color: "transparent"
+            visible: Quickshell.screens.length > 0
+                && ((root.isOpen
+                    && Config.options.bar.tooltips.enablePopups
+                    && Config.options.bar.tooltips.enableKeyboardLayoutTransitionPopup)
+                    || (typeof popupContent !== "undefined" && popupContent ? popupContent.isExitAnimRunning : false))
+            screen: Quickshell.screens.find(s => s.name === Hyprland.focusedMonitor?.name) ?? Quickshell.screens[0] ?? null
 
-        anchors {
-            top: true
-            bottom: false
-            left: false
-            right: false
-        }
+            WlrLayershell.namespace: "quickshell:keyboardLayoutTransitionPopup"
+            WlrLayershell.layer: WlrLayer.Overlay
+            exclusionMode: ExclusionMode.Ignore
+            exclusiveZone: 0
 
-        // Responsive top margin - offset from top bar (if active at the top) to avoid overlaps
-        readonly property int topMarginValue: {
-            if (!Config.options.bar.vertical && !Config.options.bar.bottom) {
-                // Bar is active at the top
-                return Appearance.sizes.barHeight + 12;
+            anchors {
+                top: true
+                bottom: false
+                left: false
+                right: false
             }
-            return 24; // Standard sleek top margin if bar is on the bottom or side
-        }
 
-        margins {
-            top: 0
-        }
+            // Responsive top margin - offset from top bar (if active at the top) to avoid overlaps
+            readonly property int topMarginValue: {
+                if (!Config.options.bar.vertical && !Config.options.bar.bottom) {
+                    // Bar is active at the top
+                    return Appearance.sizes.barHeight + 12;
+                }
+                return 24; // Standard sleek top margin if bar is on the bottom or side
+            }
 
-        implicitWidth: popupContent.implicitWidth
-        implicitHeight: popupContent.implicitHeight + topMarginValue
+            margins {
+                top: 0
+            }
 
-        mask: Region {
-            item: popupContent.staticMaskTarget
-        }
+            implicitWidth: popupContent.implicitWidth
+            implicitHeight: popupContent.implicitHeight + topMarginValue
 
-        KeyboardLayoutTransitionPopupContent {
-            id: popupContent
-            isOpen: root.isOpen
-            topMarginValue: popupWindow.topMarginValue
+            mask: Region {
+                item: popupContent.staticMaskTarget
+            }
+
+            KeyboardLayoutTransitionPopupContent {
+                id: popupContent
+                isOpen: root.isOpen
+                topMarginValue: popupWindow.topMarginValue
+            }
         }
     }
 }

@@ -17,17 +17,63 @@ Singleton {
         Quickshell.execDetached([Directories.cliPath, "hyprset", "key", key, String(value)])
     }
 
-    function changeAnimation(animName, style) {
-        if (/['"\\`$|&;]/.test(String(animName)) || /['"\\`$|&;]/.test(String(style))) {
-            console.error("[HyprlandSettings] Unsafe characters rejected:", animName, style)
-            return
+    function changeAnimationSpec(leaf, enabled, speed, curve, style) {
+        const allowedLeaves = [
+            "global", "windows", "windowsIn", "windowsOut", "windowsMove",
+            "fadeIn", "fadeOut", "fadeSwitch", "fadeShadow", "fadeDim", "fadeLayers",
+            "fadeLayersIn", "fadeLayersOut", "layers", "layersIn", "layersOut",
+            "workspaces", "workspacesIn", "workspacesOut", "specialWorkspace",
+            "specialWorkspaceIn", "specialWorkspaceOut", "border", "borderangle",
+            "zoomFactor", "fadePopups", "fadePopupsIn", "fadePopupsOut"
+        ];
+        if (typeof leaf !== "string" || !allowedLeaves.includes(leaf)) {
+            console.error("[HyprlandSettings] Invalid animation leaf:", leaf);
+            return;
         }
-        // Apply immediately via hyprctl keyword (takes effect right away, unlike hyprset which only edits a file)
-        Quickshell.execDetached(["hyprctl", "keyword", "animation", animName + ",1,7,menu_decel," + style]);
-        // Also write to persistent config file via hyprset.sh directly
-        // (vynx hyprset fails because ~/.local/bin/vynx is a symlink whose resolved
-        // basename is "setup-ii-vynx.sh", so the CLI dispatcher never activates)
-        Quickshell.execDetached(["bash", Directories.home.replace("file://", "") + "/.local/share/ii-vynx/sdata/cli/lib/hyprset.sh", "anim", animName, String(style)])
+        const isEnabled = Boolean(enabled);
+        const numSpeed = Number(speed);
+        if (isNaN(numSpeed) || numSpeed <= 0 || numSpeed > 50) {
+            console.error("[HyprlandSettings] Invalid animation speed:", speed);
+            return;
+        }
+        if (curve && /[^a-zA-Z0-9_-]/.test(String(curve))) {
+            console.error("[HyprlandSettings] Unsafe characters in curve name:", curve);
+            return;
+        }
+        if (style && /[^a-zA-Z0-9_% ]/.test(String(style))) {
+            console.error("[HyprlandSettings] Unsafe characters in animation style:", style);
+            return;
+        }
+
+        let luaExpr = "hl.animation({ leaf = '" + leaf + "', enabled = " + (isEnabled ? "true" : "false") + ", speed = " + numSpeed.toFixed(2);
+        if (curve && String(curve).trim() !== "") {
+            luaExpr += ", bezier = '" + String(curve).trim() + "'";
+        }
+        if (style && String(style).trim() !== "") {
+            luaExpr += ", style = '" + String(style).trim() + "'";
+        }
+        luaExpr += " })";
+
+        Quickshell.execDetached(["hyprctl", "eval", luaExpr]);
+    }
+
+    function updateAppLaunchAnimation(enabled, startPercent, speed, curve) {
+        const isEnabled = enabled !== false;
+        const percent = Math.max(5, Math.min(100, Math.round(Number(startPercent) || 20)));
+        const animSpeed = Math.max(0.5, Math.min(20, Number(speed) || 3.2));
+        const animCurve = (typeof curve === "string" && curve.trim() !== "") ? curve.trim() : "iiAppOpen";
+
+        const inStyle = isEnabled ? ("popin " + percent + "%") : "popin 100%";
+        const outPercent = Math.min(90, Math.round(percent + (100 - percent) * 0.5));
+        const outStyle = isEnabled ? ("popin " + outPercent + "%") : "popin 100%";
+        changeAnimationSpec("windowsIn", isEnabled, animSpeed, animCurve, inStyle);
+        changeAnimationSpec("fadeIn", isEnabled, animSpeed, animCurve, "");
+        changeAnimationSpec("windowsOut", isEnabled, animSpeed, animCurve, outStyle);
+        changeAnimationSpec("fadeOut", isEnabled, animSpeed, animCurve, "");
+    }
+
+    function changeAnimation(animName, style) {
+        changeAnimationSpec(animName, true, 7, "menu_decel", style);
     }
 
     function setLayout(layout) {

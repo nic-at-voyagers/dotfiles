@@ -2,6 +2,7 @@ pragma Singleton
 
 import QtQuick
 import qs.modules.common
+import qs.services
 import Quickshell
 
 Singleton {
@@ -19,22 +20,33 @@ Singleton {
     property int clockHour: DateTime.clock.hours
     property int clockMinute: DateTime.clock.minutes
 
-    onAutomaticChanged: {
-        if (automatic) {
-            checkTime();
+    // Config's FileView loads asynchronously, so shell.qml touches this singleton
+    // while the adapter still holds QML defaults rather than the user's config.json.
+    // Acting on that window regenerates the whole theme in the wrong mode, and the
+    // result is what the next start reads back.
+    property bool initialized: false
+
+    onAutomaticChanged: checkTime()
+
+    onClockMinuteChanged: checkTime()
+
+    Component.onCompleted: root.initialize()
+
+    Connections {
+        target: Config
+        function onReadyChanged() {
+            root.initialize();
         }
     }
 
-    onClockMinuteChanged: {
-        if (automatic) {
-            checkTime();
-        }
-    }
-
-    Component.onCompleted: {
+    function initialize() {
+        if (root.initialized || !Config.ready)
+            return;
+        root.initialized = true;
         // Always reset to false on startup — auto dark mode should not persist
         // across reboots. User must explicitly re-enable it each session.
         Config.options.light.darkMode.automatic = false;
+        root.checkTime();
     }
 
     function inBetween(t, from, to) {
@@ -47,9 +59,9 @@ Singleton {
     }
 
     function checkTime() {
-        if (!automatic)
+        if (!root.initialized || !automatic)
             return;
-            
+
         const t = clockHour * 60 + clockMinute;
         const fromMinutes = fromHour * 60 + fromMinute;
         const toMinutes = toHour * 60 + toMinute;
@@ -63,12 +75,26 @@ Singleton {
 
     function enableDarkMode() {
         if (!Appearance.m3colors.darkmode) {
+            if (Config.options?.background?.useSeparateLightModeWallpaper) {
+                const darkPath = Config.options.background.wallpaperPath;
+                if (darkPath && darkPath !== "") {
+                    Wallpapers.apply(darkPath, true);
+                    return;
+                }
+            }
             Quickshell.execDetached([Directories.wallpaperSwitchScriptPath, "--mode", "dark", "--noswitch"]);
         }
     }
 
     function disableDarkMode() {
         if (Appearance.m3colors.darkmode) {
+            if (Config.options?.background?.useSeparateLightModeWallpaper) {
+                const lightPath = Config.options.background.lightModeWallpaperPath;
+                if (lightPath && lightPath !== "") {
+                    Wallpapers.applyLightModeWallpaper(lightPath);
+                    return;
+                }
+            }
             Quickshell.execDetached([Directories.wallpaperSwitchScriptPath, "--mode", "light", "--noswitch"]);
         }
     }

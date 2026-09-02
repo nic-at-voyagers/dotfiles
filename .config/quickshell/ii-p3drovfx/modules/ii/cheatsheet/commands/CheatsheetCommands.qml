@@ -316,7 +316,7 @@ Item {
 
                                                 StyledText {
                                                     text: tagMa.tagValue === "" ? qsTr("All") : tagMa.tagValue
-                                                    font.pixelSize: Appearance.font.pixelSize.default
+                                                    font.pixelSize: Appearance.font.pixelSize.normal
                                                     font.weight: root.activeTag === tagMa.tagValue ? Font.Medium : Font.Normal
                                                     color: root.activeTag === tagMa.tagValue ? root.colTitle : root.colSubtitle
                                                     Layout.fillWidth: true
@@ -649,6 +649,26 @@ Item {
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.bottom: parent.bottom
             anchors.bottomMargin: 8
+
+            transform: Translate {
+                id: searchBarTrans
+                y: (root.visible && swipeView.currentIndex === index) ? 0 : 35
+            }
+            opacity: (root.visible && swipeView.currentIndex === index) ? 1.0 : 0.0
+
+            Behavior on opacity {
+                NumberAnimation {
+                    duration: 250
+                    easing.type: Easing.OutCubic
+                }
+            }
+            Behavior on transform {
+                NumberAnimation {
+                    duration: 350
+                    easing.type: Easing.OutBack
+                    easing.overshoot: 1.3
+                }
+            }
 
             ToolbarTextField {
                 id: filterField

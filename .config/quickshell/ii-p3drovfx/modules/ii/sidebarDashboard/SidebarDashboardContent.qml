@@ -7,6 +7,7 @@ import qs.modules.ii.bar.shared
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import QtQuick.Effects
 import Quickshell
 import Quickshell.Bluetooth
 import Quickshell.Hyprland
@@ -21,6 +22,11 @@ import qs.modules.ii.sidebarDashboard.volumeMixer
 import qs.modules.ii.sidebarDashboard.wifiNetworks
 import qs.modules.ii.sidebarDashboard.darkMode
 import qs.modules.ii.sidebarDashboard.localSend
+import qs.modules.ii.sidebarDashboard.vpn
+import qs.modules.ii.sidebarDashboard.tailscale
+import qs.modules.ii.sidebarDashboard.dnsOverTls
+import qs.modules.ii.sidebarDashboard.idleInhibitor
+import qs.modules.ii.sidebarDashboard.screenShader
 
 Item {
     id: root
@@ -33,7 +39,12 @@ Item {
     property bool showWifiDialog: false
     property bool showDarkModeDialog: false
     property bool showLocalSendDialog: false
-    readonly property bool anyDialogVisible: showAudioOutputDialog || showAudioInputDialog || showBluetoothDialog || showNightLightDialog || showWifiDialog || showDarkModeDialog || showLocalSendDialog
+    property bool showVpnDialog: false
+    property bool showTailscaleDialog: false
+    property bool showDnsOverTlsDialog: false
+    property bool showIdleInhibitorDialog: false
+    property bool showScreenShaderDialog: false
+    readonly property bool anyDialogVisible: showAudioOutputDialog || showAudioInputDialog || showBluetoothDialog || showNightLightDialog || showWifiDialog || showDarkModeDialog || showLocalSendDialog || showVpnDialog || showTailscaleDialog || showDnsOverTlsDialog || showIdleInhibitorDialog || showScreenShaderDialog
     property bool editMode: false
 
     property int entranceTrigger: -1
@@ -67,6 +78,11 @@ Item {
                 root.showAudioInputDialog = false;
                 root.showDarkModeDialog = false;
                 root.showLocalSendDialog = false;
+                root.showVpnDialog = false;
+                root.showTailscaleDialog = false;
+                root.showDnsOverTlsDialog = false;
+                root.showIdleInhibitorDialog = false;
+                root.showScreenShaderDialog = false;
             }
         }
     }
@@ -91,13 +107,11 @@ Item {
 
     Loader {
         id: sidebarRightShadowLoader
-        active: !GlobalStates.connectModeActive || GlobalStates.connectSidebarsSeparate || root.isDynamicIslandTop || root.isDynamicIslandBottom
-        anchors.fill: sidebarRightBackground
+        active: (!GlobalStates.connectModeActive || GlobalStates.connectSidebarsSeparate || root.isDynamicIslandTop || root.isDynamicIslandBottom) && !root.anyDialogVisible
         sourceComponent: Component {
-            StyledDropShadow {
+            StyledRectangularShadow {
                 target: sidebarRightBackground
-                radius: Math.round(0.9 * Appearance.sizes.elevationMargin)
-                opacity: sidebarRightBackground.opacity
+                radius: sidebarRightBackground.radius
             }
         }
     }
@@ -105,9 +119,9 @@ Item {
         id: sidebarRightBackground
 
         anchors.fill: parent
-        implicitHeight: parent.height - Appearance.sizes.hyprlandGapsOut * 2
+        implicitHeight: Math.max(0, parent.height - Appearance.sizes.hyprlandGapsOut * 2)
         implicitWidth: sidebarWidth - Appearance.sizes.hyprlandGapsOut * 2
-        color: Config.options.bar.expressiveColors ? activeTheme.barBackground : Appearance.colors.colLayer0
+        color: (GlobalStates.connectModeActive && !GlobalStates.connectSidebarsSeparate) ? "transparent" : (Config.options.bar.expressiveColors ? activeTheme.barBackground : Appearance.colors.colLayer0)
         border.width: (GlobalStates.connectModeActive && !GlobalStates.connectSidebarsSeparate) ? 0 : 1
         border.color: (GlobalStates.connectModeActive && !GlobalStates.connectSidebarsSeparate) ? "transparent" : Appearance.colors.colLayer0Border
         readonly property bool isConnectDynamicIslandTop: GlobalStates.connectModeActive && !GlobalStates.connectSidebarsSeparate && root.isDynamicIslandTop
@@ -119,10 +133,22 @@ Item {
         bottomRightRadius: (GlobalStates.connectModeActive && !GlobalStates.connectSidebarsSeparate && !isConnectDynamicIslandBottom) ? 0 : ((isConnectDynamicIslandBottom && !root.isLoadedOnLeft) ? 0 : defaultRadius)
         bottomLeftRadius: (GlobalStates.connectModeActive && !GlobalStates.connectSidebarsSeparate && !isConnectDynamicIslandBottom) ? 0 : ((isConnectDynamicIslandBottom && root.isLoadedOnLeft) ? 0 : defaultRadius)
 
+        property real dialogBlurProgress: root.anyDialogVisible ? 1.0 : 0.0
+        Behavior on dialogBlurProgress {
+            NumberAnimation { duration: 320; easing.type: Easing.OutCubic }
+        }
+
         ColumnLayout {
             anchors.fill: parent
             anchors.margins: sidebarPadding
             spacing: sidebarPadding
+
+            layer.enabled: sidebarRightBackground.dialogBlurProgress > 0.01
+            layer.effect: MultiEffect {
+                blurEnabled: true
+                blurMax: 32
+                blur: sidebarRightBackground.dialogBlurProgress
+            }
 
             SystemButtonRow {
                 id: headerRow
@@ -139,7 +165,10 @@ Item {
             LoaderedQuickPanelImplementation {
                 id: classicQuickPanelLoader
                 styleName: "classic"
-                sourceComponent: ClassicQuickPanel {}
+                sourceComponent: ClassicQuickPanel {
+                    onOpenVpnDialog: root.showVpnDialog = true
+                    onOpenTailscaleDialog: root.showTailscaleDialog = true
+                }
             }
 
             LoaderedQuickPanelImplementation {
@@ -147,11 +176,20 @@ Item {
                 styleName: "android"
                 sourceComponent: AndroidQuickPanel {
                     editMode: root.editMode
+                    onOpenVpnDialog: root.showVpnDialog = true
+                    onOpenTailscaleDialog: root.showTailscaleDialog = true
+                    onOpenDnsOverTlsDialog: root.showDnsOverTlsDialog = true
+                    onOpenScreenShaderDialog: root.showScreenShaderDialog = true
                 }
             }
 
-            CenterWidgetGroup {
+            Loader {
                 id: centerGroup
+                // Notifications remain backed by their global service; only the
+                // heavy visual center group is discarded while the sidebar is closed.
+                active: GlobalStates.sidebarRightOpen
+                asynchronous: true
+                sourceComponent: CenterWidgetGroup {}
                 Layout.alignment: Qt.AlignHCenter
                 Layout.fillHeight: true
                 Layout.fillWidth: true
@@ -174,57 +212,88 @@ Item {
         }
     }
 
-    ToggleDialog {
+    DialogHostLoader {
+        owner: root
         shownPropertyString: "showAudioOutputDialog"
+        dialogRadius: sidebarRightBackground.defaultRadius
         dialog: VolumeDialog {
             isSink: true
         }
     }
 
-    ToggleDialog {
+    DialogHostLoader {
+        owner: root
         shownPropertyString: "showAudioInputDialog"
+        dialogRadius: sidebarRightBackground.defaultRadius
         dialog: VolumeDialog {
             isSink: false
         }
     }
 
-    ToggleDialog {
+    DialogHostLoader {
+        owner: root
         shownPropertyString: "showBluetoothDialog"
+        dialogRadius: sidebarRightBackground.defaultRadius
         dialog: BluetoothDialog {}
-        onShownChanged: {
-            if (!shown) {
-                Bluetooth.defaultAdapter.discovering = false;
-            } else {
-                Bluetooth.defaultAdapter.enabled = true;
-                Bluetooth.defaultAdapter.discovering = true;
-            }
-        }
     }
 
-    ToggleDialog {
+    DialogHostLoader {
+        owner: root
         shownPropertyString: "showNightLightDialog"
+        dialogRadius: sidebarRightBackground.defaultRadius
         dialog: NightLightDialog {}
     }
 
-    ToggleDialog {
+    DialogHostLoader {
+        owner: root
         shownPropertyString: "showWifiDialog"
+        dialogRadius: sidebarRightBackground.defaultRadius
         dialog: WifiDialog {}
-        onShownChanged: {
-            if (!shown)
-                return;
-            Network.enableWifi();
-            Network.rescanWifi();
-        }
     }
 
-    ToggleDialog {
+    DialogHostLoader {
+        owner: root
         shownPropertyString: "showDarkModeDialog"
+        dialogRadius: sidebarRightBackground.defaultRadius
         dialog: DarkModeDialog {}
     }
 
-    ToggleDialog {
+    DialogHostLoader {
+        owner: root
         shownPropertyString: "showLocalSendDialog"
+        dialogRadius: sidebarRightBackground.defaultRadius
         dialog: LocalSendDialog {}
+    }
+
+    DialogHostLoader {
+        owner: root
+        shownPropertyString: "showVpnDialog"
+        dialogRadius: sidebarRightBackground.defaultRadius
+        dialog: VpnDialog {}
+    }
+
+    DialogHostLoader {
+        owner: root
+        shownPropertyString: "showTailscaleDialog"
+        dialogRadius: sidebarRightBackground.defaultRadius
+        dialog: TailscaleDialog {}
+    }
+
+    DialogHostLoader {
+        owner: root
+        shownPropertyString: "showDnsOverTlsDialog"
+        dialogRadius: sidebarRightBackground.defaultRadius
+        dialog: DnsOverTlsDialog {}
+    }
+
+    ToggleDialog {
+        shownPropertyString: "showIdleInhibitorDialog"
+        dialog: IdleInhibitorDialog {}
+    }
+
+    ToggleDialog {
+        shownPropertyString: "showScreenShaderDialog"
+        dialog: ScreenShaderDialog {}
     }
 
     component ToggleDialog: Loader {
@@ -291,6 +360,9 @@ Item {
             function onOpenLocalSendDialog() {
                 root.showLocalSendDialog = true;
             }
+            function onOpenIdleInhibitorDialog() {
+                root.showIdleInhibitorDialog = true;
+            }
         }
     }
 
@@ -302,23 +374,46 @@ Item {
         signal editModeToggled(bool newEditMode)
 
         // Entrance animation properties
+        property real _leftTranslateX: -30
+        property real _rightTranslateX: 30
+        property real _entranceTranslateY: -15
         property real _entranceOpacity: 0
-        property real _entranceTranslateY: -20
         property bool _entranceDone: false
+        readonly property bool _animationsDisabled: (Config.options?.appearance?.animationMultiplier ?? 1.0) <= 0.25
 
         onEntranceTriggerChanged: {
+            if (_animationsDisabled) {
+                _entranceDone = true;
+                _entranceOpacity = 1;
+                _leftTranslateX = 0;
+                _rightTranslateX = 0;
+                _entranceTranslateY = 0;
+                return;
+            }
             _entranceDone = false;
             _entranceOpacity = 0;
-            _entranceTranslateY = -20;
+            _leftTranslateX = -30;
+            _rightTranslateX = 30;
+            _entranceTranslateY = -15;
             Qt.callLater(function() {
                 entranceAnim.start();
             });
         }
 
         Component.onCompleted: {
+            if (_animationsDisabled) {
+                _entranceDone = true;
+                _entranceOpacity = 1;
+                _leftTranslateX = 0;
+                _rightTranslateX = 0;
+                _entranceTranslateY = 0;
+                return;
+            }
             _entranceDone = false;
             _entranceOpacity = 0;
-            _entranceTranslateY = -20;
+            _leftTranslateX = -30;
+            _rightTranslateX = 30;
+            _entranceTranslateY = -15;
             Qt.callLater(function() {
                 entranceAnim.start();
             });
@@ -328,7 +423,9 @@ Item {
             id: entranceAnim
             ParallelAnimation {
                 NumberAnimation { target: systemButtonRowRoot; property: "_entranceOpacity"; from: 0; to: 1; duration: 280; easing.type: Easing.OutCubic }
-                NumberAnimation { target: systemButtonRowRoot; property: "_entranceTranslateY"; from: -20; to: 0; duration: 320; easing.type: Easing.OutCubic }
+                NumberAnimation { target: systemButtonRowRoot; property: "_leftTranslateX"; from: -30; to: 0; duration: 320; easing.type: Easing.OutCubic }
+                NumberAnimation { target: systemButtonRowRoot; property: "_rightTranslateX"; from: 30; to: 0; duration: 340; easing.type: Easing.OutCubic }
+                NumberAnimation { target: systemButtonRowRoot; property: "_entranceTranslateY"; from: -15; to: 0; duration: 300; easing.type: Easing.OutCubic }
             }
             PropertyAction { target: systemButtonRowRoot; property: "_entranceDone"; value: true }
         }
@@ -348,12 +445,15 @@ Item {
 
             opacity: systemButtonRowRoot._entranceDone ? 1.0 : systemButtonRowRoot._entranceOpacity
             transform: Translate {
+                x: systemButtonRowRoot._entranceDone ? 0 : systemButtonRowRoot._leftTranslateX
                 y: systemButtonRowRoot._entranceDone ? 0 : systemButtonRowRoot._entranceTranslateY
             }
 
             property int rowLeftMargin: Config.options.sidebar.dashboardHeader.profileImageType === "user_profile" ? 6 : 14
+            readonly property bool _hasText: Config.options.sidebar.dashboardHeader.textMode !== "none"
+            readonly property int rowRightMargin: _hasText ? 14 : rowLeftMargin
 
-            implicitWidth: uptimeRow.implicitWidth + rowLeftMargin + 14
+            implicitWidth: uptimeRow.implicitWidth + rowLeftMargin + rowRightMargin
             implicitHeight: Math.max(32, uptimeRow.implicitHeight + (Config.options.sidebar.dashboardHeader.profileImageType === "user_profile" ? 4 : 12))
 
             Row {
@@ -473,8 +573,6 @@ Item {
                                     return MaterialShape.Shape.Cookie9Sided;
                                 case "Cookie12Sided":
                                     return MaterialShape.Shape.Cookie12Sided;
-                                case "Squircle":
-                                    return MaterialShape.Shape.Squircle;
                                 case "Circle":
                                     return MaterialShape.Shape.Circle;
                                 case "Clover4Leaf":
@@ -586,6 +684,7 @@ Item {
 
             opacity: systemButtonRowRoot._entranceDone ? 1.0 : systemButtonRowRoot._entranceOpacity
             transform: Translate {
+                x: systemButtonRowRoot._entranceDone ? 0 : systemButtonRowRoot._rightTranslateX
                 y: systemButtonRowRoot._entranceDone ? 0 : systemButtonRowRoot._entranceTranslateY
             }
 

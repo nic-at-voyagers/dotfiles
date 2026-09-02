@@ -1,127 +1,76 @@
 import QtQuick
 import QtQuick.Layouts
 import Quickshell
-import qs.services
 import qs.modules.common
+import qs.modules.common.functions
 import qs.modules.common.widgets
+import qs.modules.settings.configs.widgets
+import qs.services
 
-ContentPage {
-    id: page
-    forceWidth: false
+Item {
+    id: workspacesRoot
+    anchors.fill: parent
 
-    property bool showBackButton: false
-    signal goBack()
+    property alias contentY: page.contentY
+    property alias activeSubPage: subPageOverlay.activeSubPage
 
-    RowLayout {
-        spacing: 12
-        visible: page.showBackButton
+    ContentPage {
+        id: page
+        anchors.fill: parent
+        forceWidth: false
+        opacity: subPageOverlay.slideProgress
 
-        RippleButton {
-            implicitWidth: implicitHeight
-            implicitHeight: 40
-            topLeftRadius: Appearance.rounding.full
-            topRightRadius: Appearance.rounding.full
-            bottomLeftRadius: Appearance.rounding.full
-            bottomRightRadius: Appearance.rounding.full
-            colBackground: Appearance.colors.colSecondaryContainer
-            colBackgroundHover: Appearance.colors.colSecondaryContainerHover
-            colRipple: Appearance.colors.colSecondaryContainerActive
+        property bool showBackButton: false
+        signal goBack()
 
-            MaterialSymbol {
-                anchors.centerIn: parent
-                text: "arrow_back"
-                iconSize: Appearance.font.pixelSize.large
-                color: Appearance.colors.colOnSecondaryContainer
+        RowLayout {
+            spacing: 12
+            visible: page.showBackButton
+
+            RippleButton {
+                implicitWidth: implicitHeight
+                implicitHeight: 40
+                topLeftRadius: Appearance.rounding.full
+                topRightRadius: Appearance.rounding.full
+                bottomLeftRadius: Appearance.rounding.full
+                bottomRightRadius: Appearance.rounding.full
+                colBackground: Appearance.colors.colSecondaryContainer
+                colBackgroundHover: Appearance.colors.colSecondaryContainerHover
+                colRipple: Appearance.colors.colSecondaryContainerActive
+                onClicked: page.goBack()
+
+                MaterialSymbol {
+                    anchors.centerIn: parent
+                    text: "arrow_back"
+                    iconSize: Appearance.font.pixelSize.large
+                    color: Appearance.colors.colOnSecondaryContainer
+                }
             }
 
-            onClicked: page.goBack()
+            StyledText {
+                text: Translation.tr("Workspaces Settings")
+                font.pixelSize: Appearance.font.pixelSize.large
+                font.family: Appearance.font.family.title
+                color: Appearance.colors.colOnLayer0
+            }
         }
 
-        StyledText {
-            text: Translation.tr("Workspaces Settings")
-            font.pixelSize: Appearance.font.pixelSize.large
-            font.family: Appearance.font.family.title
-            color: Appearance.colors.colOnLayer0
-        }
-    }
-
-    ContentSection {
-        title: Translation.tr("Display Options")
-        icon: "monitor"
-
-        // Group 1: Map toggles
-        ColumnLayout {
-            Layout.fillWidth: true
-            spacing: 4
+        ContentSection {
+            title: Translation.tr("Display Options")
+            icon: "monitor"
 
             ConfigSwitch {
                 buttonIcon: "map"
                 text: Translation.tr("Use workspace map")
                 checked: Config.options.bar.workspaces.useWorkspaceMap
+                configPage: Qt.resolvedUrl("widgets/WorkspaceMapConfig.qml")
                 onCheckedChanged: {
                     Config.options.bar.workspaces.useWorkspaceMap = checked;
                 }
                 StyledToolTip {
-                    text: Translation.tr("For multi-monitor setups, isolates workspaces ranges for each monitor")
+                    text: Translation.tr("Isolate workspace ranges for multi-monitor setups. Click button text to configure monitor mapping.")
                 }
             }
-
-            ColumnLayout {
-                visible: Config.options.bar.workspaces.useWorkspaceMap
-                Layout.fillWidth: true
-                Layout.leftMargin: 12
-                spacing: 4
-
-                ConfigSwitch {
-                    buttonIcon: "sync"
-                    text: Translation.tr("Sync overview map")
-                    checked: Config.options.overview.useWorkspaceMap
-                    onCheckedChanged: {
-                        Config.options.overview.useWorkspaceMap = checked;
-                    }
-                    StyledToolTip {
-                        text: Translation.tr("Apply the same workspace map constraints to the Overview screen")
-                    }
-                }
-
-                Repeater {
-                    model: HyprlandData.monitors
-                    delegate: ConfigSpinBox {
-                        Layout.fillWidth: true
-                        icon: "monitor"
-                        text: modelData.name ? modelData.name : (Translation.tr("Monitor ") + (index + 1))
-                        value: {
-                            let map = Config.options.bar.workspaces.workspaceMap || [];
-                            let offset = map.length > index ? map[index] : (index * (Config.options.bar.workspaces.shown || 10));
-                            return offset + 1;
-                        }
-                        from: 1
-                        to: 100
-                        stepSize: 1
-                        onValueChanged: {
-                            let map = JSON.parse(JSON.stringify(Config.options.bar.workspaces.workspaceMap || []));
-                            // Ensure array reaches this index
-                            while (map.length <= index) {
-                                map.push(map.length > 0 ? map[map.length - 1] + (Config.options.bar.workspaces.shown || 10) : 0);
-                            }
-                            map[index] = value - 1;
-                            Config.options.bar.workspaces.workspaceMap = map;
-                        }
-                        StyledToolTip {
-                            text: Translation.tr("Set starting workspaces based on the number of workspaces shown to prevent overlapping.")
-                        }
-                    }
-                }
-            }
-
-        }
-
-        Item { Layout.preferredHeight: 16 }
-
-        // Group 2: Display behaviors
-        ColumnLayout {
-            Layout.fillWidth: true
-            spacing: 4
 
             ConfigSwitch {
                 buttonIcon: "counter_1"
@@ -154,6 +103,16 @@ ContentPage {
                 }
             }
 
+            ConfigSlider {
+                visible: Config.options.bar.workspaces.showAppIcons
+                buttonIcon: "humidity_percentage"
+                text: Translation.tr("Tint (%)")
+                value: Config.options.appearance.iconTintPercentage ?? 0.6
+                onValueChanged: Config.options.appearance.iconTintPercentage = value
+                enabled: Config.options.bar.workspaces.monochromeIcons
+                opacity: enabled ? 1 : 0.5
+            }
+
             ConfigSwitch {
                 buttonIcon: "hdr_weak"
                 text: Translation.tr("Dynamic workspaces")
@@ -165,14 +124,6 @@ ContentPage {
                     text: Translation.tr("Hides the empty workspaces and only shows the ones with windows")
                 }
             }
-        }
-
-        Item { Layout.preferredHeight: 16 }
-
-        // Group 3: Counts & Limits
-        ColumnLayout {
-            Layout.fillWidth: true
-            spacing: 4
 
             ConfigSpinBox {
                 enabled: !Config.options.bar.workspaces.dynamicWorkspaces
@@ -198,14 +149,6 @@ ContentPage {
                     Config.options.bar.workspaces.maxWindowCount = value;
                 }
             }
-        }
-
-        Item { Layout.preferredHeight: 16 }
-
-        // Group 4: Number styles
-        ColumnLayout {
-            Layout.fillWidth: true
-            spacing: 4
 
             ConfigSpinBox {
                 icon: "touch_long"
@@ -226,39 +169,29 @@ ContentPage {
 
                 ConfigSelectionArray {
                     currentValue: JSON.stringify(Config.options.bar.workspaces.numberMap)
-                    onSelected: newValue => {
+                    onSelected: (newValue) => {
                         Config.options.bar.workspaces.numberMap = JSON.parse(newValue);
                     }
-                    options: [
-                        {
-                            displayName: Translation.tr("Normal"),
-                            icon: "timer_10",
-                            value: '[]'
-                        },
-                        {
-                            displayName: Translation.tr("Han chars"),
-                            icon: "square_dot",
-                            value: '["一","二","三","四","五","六","七","八","九","十","十一","十二","十三","十四","十五","十六","十七","十八","十九","二十"]'
-                        },
-                        {
-                            displayName: Translation.tr("Roman"),
-                            icon: "account_balance",
-                            value: '["I","II","III","IV","V","VI","VII","VIII","IX","X","XI","XII","XIII","XIV","XV","XVI","XVII","XVIII","XIX","XX"]'
-                        }
-                    ]
+                    options: [{
+                        "displayName": Translation.tr("Normal"),
+                        "icon": "timer_10",
+                        "value": '[]'
+                    }, {
+                        "displayName": Translation.tr("Han chars"),
+                        "icon": "square_dot",
+                        "value": '["一","二","三","四","五","六","七","八","九","十","十一","十二","十三","十四","十五","十六","十七","十八","十九","二十"]'
+                    }, {
+                        "displayName": Translation.tr("Roman"),
+                        "icon": "account_balance",
+                        "value": '["I","II","III","IV","V","VI","VII","VIII","IX","X","XI","XII","XIII","XIV","XV","XVI","XVII","XVIII","XIX","XX"]'
+                    }]
                 }
             }
         }
-    }
 
-    ContentSection {
-        title: Translation.tr("Shape Customization")
-        icon: "category"
-
-        // Group 1: Icon shapes
-        ColumnLayout {
-            Layout.fillWidth: true
-            spacing: 4
+        ContentSection {
+            title: Translation.tr("Shape Customization")
+            icon: "category"
 
             ConfigSwitch {
                 buttonIcon: "interests"
@@ -270,6 +203,7 @@ ContentPage {
                 StyledToolTip {
                     text: Translation.tr("Crops the icons using the selected material shape")
                 }
+
                 extraComponent: Component {
                     RippleButtonWithShape {
                         enabled: Config.options.appearance.icons.enableShapeMask
@@ -291,33 +225,26 @@ ContentPage {
                 active: false
                 visible: active
                 Layout.fillWidth: true
+
                 sourceComponent: ContentSubsection {
                     title: Translation.tr("Mask shape")
                     icon: "shape_line"
 
                     ConfigSelectionArray {
                         currentValue: Config.options.appearance.icons.shapeMask
-                        onSelected: newValue => {
+                        onSelected: (newValue) => {
                             Config.options.appearance.icons.shapeMask = newValue;
                         }
-                        options: (["Circle", "Square", "Slanted", "Arch", "Arrow", "SemiCircle", "Oval", "Pill", "Triangle", "Diamond", "ClamShell", "Pentagon", "Gem", "Sunny", "VerySunny", "Cookie4Sided", "Cookie6Sided", "Cookie7Sided", "Cookie9Sided", "Cookie12Sided", "Ghostish", "Clover4Leaf", "Clover8Leaf", "Burst", "SoftBurst", "Flower", "Puffy", "PuffyDiamond", "PixelCircle", "Bun", "Heart"]).map(icon => {
+                        options: (["Circle", "Square", "Slanted", "Arch", "Arrow", "SemiCircle", "Oval", "Pill", "Triangle", "Diamond", "ClamShell", "Pentagon", "Gem", "Sunny", "VerySunny", "Cookie4Sided", "Cookie6Sided", "Cookie7Sided", "Cookie9Sided", "Cookie12Sided", "Ghostish", "Clover4Leaf", "Clover8Leaf", "Burst", "SoftBurst", "Flower", "Puffy", "PuffyDiamond", "PixelCircle", "Bun", "Heart"]).map((icon) => {
                             return {
-                                displayName: "",
-                                shape: icon,
-                                value: icon
+                                "displayName": "",
+                                "shape": icon,
+                                "value": icon
                             };
                         })
                     }
                 }
             }
-        }
-
-        Item { Layout.preferredHeight: 16 }
-
-        // Group 2: Active indicator shapes
-        ColumnLayout {
-            Layout.fillWidth: true
-            spacing: 4
 
             ConfigSwitch {
                 buttonIcon: "token"
@@ -326,6 +253,7 @@ ContentPage {
                 onCheckedChanged: {
                     Config.options.bar.workspaces.useMaterialShapeForActiveIndicator = checked;
                 }
+
                 extraComponent: Component {
                     RippleButtonWithShape {
                         enabled: Config.options.bar.workspaces.useMaterialShapeForActiveIndicator
@@ -347,20 +275,21 @@ ContentPage {
                 active: false
                 visible: active
                 Layout.fillWidth: true
+
                 sourceComponent: ContentSubsection {
                     title: Translation.tr("Active indicator shape")
                     icon: "shape_line"
 
                     ConfigSelectionArray {
                         currentValue: Config.options.bar.workspaces.activeIndicatorShape
-                        onSelected: newValue => {
+                        onSelected: (newValue) => {
                             Config.options.bar.workspaces.activeIndicatorShape = newValue;
                         }
-                        options: (["Circle", "Square", "Slanted", "Arch", "Arrow", "SemiCircle", "Oval", "Pill", "Triangle", "Diamond", "ClamShell", "Pentagon", "Gem", "Sunny", "VerySunny", "Cookie4Sided", "Cookie6Sided", "Cookie7Sided", "Cookie9Sided", "Cookie12Sided", "Ghostish", "Clover4Leaf", "Clover8Leaf", "Burst", "SoftBurst", "Flower", "Puffy", "PuffyDiamond", "PixelCircle", "Bun", "Heart"]).map(icon => {
+                        options: (["Circle", "Square", "Slanted", "Arch", "Arrow", "SemiCircle", "Oval", "Pill", "Triangle", "Diamond", "ClamShell", "Pentagon", "Gem", "Sunny", "VerySunny", "Cookie4Sided", "Cookie6Sided", "Cookie7Sided", "Cookie9Sided", "Cookie12Sided", "Ghostish", "Clover4Leaf", "Clover8Leaf", "Burst", "SoftBurst", "Flower", "Puffy", "PuffyDiamond", "PixelCircle", "Bun", "Heart"]).map((icon) => {
                             return {
-                                displayName: "",
-                                shape: icon,
-                                value: icon
+                                "displayName": "",
+                                "shape": icon,
+                                "value": icon
                             };
                         })
                     }
@@ -377,5 +306,52 @@ ContentPage {
                 }
             }
         }
+
+        ContentSection {
+            visible: Config.options.bar.styles.workspaces === "dock"
+            title: Translation.tr("Dock Workspace Style")
+            icon: "dock"
+
+            ConfigSwitch {
+                buttonIcon: "dock"
+                text: Translation.tr("Dock workspace style options")
+                checked: Config.options.bar.workspaces.dockShowActiveIndicator
+                configPage: Qt.resolvedUrl("widgets/DockWorkspaceConfig.qml")
+                onCheckedChanged: {
+                    Config.options.bar.workspaces.dockShowActiveIndicator = checked;
+                }
+                StyledToolTip {
+                    text: Translation.tr("Click button text to configure active indicator, window count dots, hover effects, and app icons in dock style.")
+                }
+            }
+        }
+
+        ContentSection {
+            title: Translation.tr("Workspace Compactor")
+            icon: "compress"
+
+            HelperCodeBox {
+                Layout.fillWidth: true
+                icon: "terminal"
+                title: Translation.tr("Build it once")
+                text: Translation.tr("Pulls the focused monitor's occupied workspaces down to 1..N with no gaps, keeping windows together and restoring their geometry. Rust is the only requirement.")
+                codeSnippet: `cd ${Directories.scriptPath.replace(FileUtils.trimFileProtocol(Directories.home), "~")}/hyprland/workspace_compactor_src
+cargo build --release
+cp target/release/workspace_compactor ../`
+                snippetWrapMode: Text.Wrap
+            }
+
+            KeyboardShortcutBox {
+                Layout.fillWidth: true
+                text: Translation.tr("Compact workspaces into 1..N")
+                keys: ["Ctrl", "Super", "C"]
+            }
+        }
+    }
+
+    ConfigSubPageHost {
+        id: subPageOverlay
+        anchors.fill: parent
+        z: 10
     }
 }

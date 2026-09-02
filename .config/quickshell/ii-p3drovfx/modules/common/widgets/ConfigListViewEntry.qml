@@ -13,25 +13,23 @@ Item {
     readonly property var compInfo: BarComponentRegistry.getComponent(modelData.id)
 
     property bool alternateColor: visualIndex % 2 == 0
-    property color colBackground: alternateColor ? Appearance.colors.colLayer3 : Appearance.colors.colLayer2Base
+    property color colBackground: alternateColor ? Appearance.colors.colLayer3 : Appearance.colors.colLayer2
     property color colHover: alternateColor ? Appearance.colors.colLayer3Hover : Appearance.colors.colLayer2Hover
     property color colActive: alternateColor ? Appearance.colors.colLayer3Active : Appearance.colors.colLayer2Active
 
     property color colTitle: Appearance.colors.colOnLayer0
+    readonly property bool performanceMode: Config.options?.appearance?.settingsPerformanceMode ?? false
 
     property int barSection
+    property real entryHeight: 48
 
     anchors {
         right: parent?.right
         left: parent?.left
     }
-    height: content.height
+    height: wrapper.entryHeight
+    implicitHeight: wrapper.entryHeight
     property int visualIndex: DelegateModel.itemsIndex
-
-
-    Behavior on y {
-        animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
-    }
 
     function getOrderedList() {
         var ordered = []
@@ -63,13 +61,15 @@ Item {
             verticalCenter: parent.verticalCenter
         }
 
-        scale: dragArea.held ? 1.02 : 1
-        opacity: dragArea.held ? 0.8 : 1
+        scale: wrapper.performanceMode ? 1 : (dragArea.held ? 1.02 : 1)
+        opacity: wrapper.performanceMode ? 1 : (dragArea.held ? 0.8 : 1)
 
         Behavior on scale {
+            enabled: !wrapper.performanceMode
             animation: Appearance.animation.elementResize.numberAnimation.createObject(this)
         }
         Behavior on opacity {
+            enabled: !wrapper.performanceMode
             animation: Appearance.animation.elementResize.numberAnimation.createObject(this)
         }
         
@@ -78,10 +78,11 @@ Item {
         bottomLeftRadius: bottomRadius
         bottomRightRadius: bottomRadius
 
-        height: contentRow.implicitHeight + 4
+        height: wrapper.entryHeight
 
         color: dragArea.held ? colActive : colBackground
         Behavior on color {
+            enabled: !wrapper.performanceMode
             animation: Appearance.animation.elementMoveFast.colorAnimation.createObject(this)
         }
 
@@ -154,17 +155,18 @@ Item {
                 active: wrapper.compInfo?.styleConfigKey !== undefined
                 visible: active
                 
-                Layout.preferredWidth: item ? (item.calculatedWidth !== undefined ? item.calculatedWidth : item.implicitWidth) : 0
-                Layout.minimumWidth: Layout.preferredWidth
+                Layout.preferredWidth: item ? item.implicitWidth : 0
+                Layout.minimumWidth: 0
 
-                sourceComponent: ConfigSelectionArray {
+                sourceComponent: BarWidgetStyleSelector {
                     readonly property string styleKey: wrapper.compInfo?.styleConfigKey ?? ""
+                    styleConfigKey: styleKey
+                    styleOptions: wrapper.compInfo?.styleOptions ?? []
                     currentValue: styleKey !== "" ? (Config.options.bar.styles[styleKey] ?? "default") : "default"
                     onSelected: newValue => {
                         if (styleKey !== "")
                             Config.options.bar.styles[styleKey] = newValue
                     }
-                    options: wrapper.compInfo?.styleOptions ?? []
                 }
             }
 
@@ -179,17 +181,17 @@ Item {
             }
 
             Loader {
-                active: wrapper.compInfo?.sidebarPage !== undefined
+                active: wrapper.compInfo?.pageId !== undefined
                 visible: active
                 sourceComponent: EntryButton {
                     iconText: "open_in_new"
                     tooltip: Translation.tr("Open sidebar page")
                     onClicked: {
                         var win = wrapper.QsWindow.window;
-                        if (win && win.currentPage !== undefined) {
+                        if (win && win.pageIndexById !== undefined) {
                             if (wrapper.compInfo.sectionTitle)
                                 win.pendingSectionHighlight = Translation.tr(wrapper.compInfo.sectionTitle);
-                            win.currentPage = wrapper.compInfo.sidebarPage;
+                            win.currentPage = win.pageIndexById(wrapper.compInfo.pageId);
                         }
                     }
                 }
@@ -253,7 +255,7 @@ Item {
         drag.target: held ? content : undefined
         drag.axis: Drag.YAxis
         drag.minimumY: 0
-        drag.maximumY: root.listModel.length * 40 + (root.listModel.length - 1) * 4
+        drag.maximumY: (root.listModel?.length ?? 1) * wrapper.entryHeight + ((root.listModel?.length ?? 1) - 1) * 4
 
         onPressAndHold: {
             root.dragging = true
@@ -282,8 +284,11 @@ Item {
             fill: button.iconFill ? 1 : 0
         }
 
-        StyledToolTip {
-            text: button.tooltip
+        Loader {
+            active: button.hovered && button.tooltip !== ""
+            sourceComponent: StyledToolTip {
+                text: button.tooltip
+            }
         }
     }
 }

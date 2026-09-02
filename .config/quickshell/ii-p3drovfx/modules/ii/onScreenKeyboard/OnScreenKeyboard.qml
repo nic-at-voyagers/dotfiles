@@ -14,6 +14,13 @@ Scope { // Scope
     id: root
     property bool pinned: Config.options?.osk.pinnedOnStartup ?? false
 
+    // Referencing the singleton from outside the Loader keeps it alive from startup:
+    // the helper has to be listening before the keyboard has ever been shown.
+    readonly property bool autoShowEnabled: OskAutoShow.enabled
+
+    // The deck is the keyboard now; the classic one stays available for anyone who wants it back.
+    readonly property bool useDeck: (Config.options?.osk.style ?? "deck") === "deck"
+
     component OskControlButton: GroupButton { // Pin button
         baseWidth: 40
         baseHeight: 40
@@ -23,8 +30,24 @@ Scope { // Scope
     }
 
     Loader {
+        id: deckLoader
+        active: GlobalStates.oskOpen && root.useDeck
+        onActiveChanged: {
+            if (!deckLoader.active) {
+                Ydotool.releaseAllKeys();
+            }
+        }
+
+        sourceComponent: DeckWindow {
+            pinned: root.pinned
+            onPinToggled: root.pinned = !root.pinned
+            onHideRequested: GlobalStates.oskOpen = false
+        }
+    }
+
+    Loader {
         id: oskLoader
-        active: GlobalStates.oskOpen
+        active: GlobalStates.oskOpen && !root.useDeck
         onActiveChanged: {
             if (!oskLoader.active) {
                 Ydotool.releaseAllKeys();
@@ -55,6 +78,21 @@ Scope { // Scope
 
             mask: Region {
                 item: oskBackground
+            }
+
+            // Normalized so OskAutoShow can test touches against it without knowing
+            // which output the touchscreen is mapped to.
+            Binding {
+                target: OskAutoShow
+                property: "keyboardBounds"
+                when: oskRoot.visible && oskRoot.screen
+                value: Qt.rect(oskBackground.x / oskRoot.screen.width, (oskRoot.screen.height - oskRoot.implicitHeight + oskBackground.y) / oskRoot.screen.height, oskBackground.width / oskRoot.screen.width, oskBackground.height / oskRoot.screen.height)
+            }
+
+            Binding {
+                target: OskAutoShow
+                property: "keyboardPinned"
+                value: root.pinned
             }
 
             // Make it usable with other panels

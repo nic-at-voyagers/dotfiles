@@ -46,7 +46,7 @@ MouseArea {
         }
     }
     
-    implicitWidth: {
+    readonly property real _contentWidth: {
         if (root.isMaterial) {
             return rowLoader.item?.width - 1
         }
@@ -58,8 +58,13 @@ MouseArea {
         }
         return rowLoader.item?.implicitWidth + 12;
     }
-    implicitHeight: Appearance.sizes.baseBarHeight
+    implicitWidth: Battery.available ? _contentWidth : 0
+    implicitHeight: Battery.available ? Appearance.sizes.baseBarHeight : 0
     hoverEnabled: !Config.options.bar.tooltips.clickToShow
+
+    Behavior on implicitWidth {
+        animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
+    }
 
     Loader {
         id: rowLoader
@@ -150,7 +155,7 @@ MouseArea {
                                 StyledText {
                                     anchors.centerIn: parent
                                     font.pixelSize: 10
-                                    font.weight: Font.Bold
+                                    font.weight: Font.DemiBold
                                     text: batteryProgress.text
                                     color: (root.isLow && !root.effectivelyCharging) ? Appearance.m3colors.m3onError : root.colText
                                 }
@@ -308,7 +313,7 @@ MouseArea {
             MaterialBarWidget {
                 primaryComponent: batteryIndicatorComponent
                 secondaryComponent: batteryPercentageComponent
-                secondaryExtraMargin: 4
+                secondaryExtraMargin: 6
                 componentsPadding: 6
 
                 showSecondary: Config.options.bar.battery.showSecondary
@@ -347,7 +352,6 @@ MouseArea {
                                 id: batteryProgress
                                 width: 26
                                 height: 14
-
                                 radius: 4.5
 
                                 value: root.percentage

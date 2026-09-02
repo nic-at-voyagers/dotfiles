@@ -1,113 +1,31 @@
 import QtQuick
 import QtQuick.Layouts
 import Quickshell
-import qs.services
 import qs.modules.common
 import qs.modules.common.widgets
+import qs.modules.settings.configs.widgets
+import qs.services
 
 Item {
     id: overlaysConfigRoot
 
     property alias contentY: page.contentY
-    property url activeSubPage: ""
+    property alias activeSubPage: subPageOverlay.activeSubPage
+
+    function triggerRealOsd() {
+        GlobalStates.osdCurrentIndicator = "volume";
+        GlobalStates.osdVolumeOpen = true;
+        GlobalStates.osdInteraction();
+        Quickshell.execDetached(["qs", "-c", "ii", "ipc", "call", "osd", "trigger"]);
+    }
 
     ContentPage {
         id: page
+
         anchors.fill: parent
         forceWidth: false
-        opacity: subPageOverlay.width > 0 ? (subPageOverlay.x / subPageOverlay.width) : 1
+        opacity: subPageOverlay.slideProgress
         visible: opacity > 0
-
-        ContentSection {
-            title: Translation.tr("Notifications")
-            icon: "notifications"
-
-            ConfigSpinBox {
-                icon: "timer"
-                text: Translation.tr("Timeout duration (ms)")
-                value: Config.options.notifications.timeout
-                from: 1000
-                to: 10000
-                stepSize: 500
-                onValueChanged: {
-                    Config.options.notifications.timeout = value;
-                }
-            }
-
-            ConfigSpinBox {
-                icon: "zoom_in"
-                text: Translation.tr("Notification size (%)")
-                value: Config.options.notifications.zoomPercent
-                from: 50
-                to: 200
-                stepSize: 10
-                onValueChanged: {
-                    Config.options.notifications.zoomPercent = value;
-                }
-            }
-
-            ConfigSwitch {
-                buttonIcon: "desktop_windows"
-                text: Translation.tr("Force specific monitor")
-                checked: Config.options.notifications.monitor.enable
-                onCheckedChanged: {
-                    Config.options.notifications.monitor.enable = checked;
-                }
-            }
-
-            ConfigTextField {
-                text: Translation.tr("Force monitor name")
-                icon: "desktop_windows"
-                visible: Config.options.notifications.monitor.enable
-                placeholderText: Translation.tr("Monitor Name (e.g. eDP-1)")
-                inputText: Config.options.notifications.monitor.name
-
-                textField.onTextChanged: {
-                    if (textField.activeFocus) {
-                        Config.options.notifications.monitor.name = textField.text;
-                    }
-                }
-            }
-
-            ConfigSwitch {
-                buttonIcon: "counter_2"
-                text: Translation.tr("Show unread count")
-                checked: Config.options.bar.indicators.notifications.showUnreadCount
-                onCheckedChanged: {
-                    Config.options.bar.indicators.notifications.showUnreadCount = checked;
-                }
-            }
-
-            ContentSubsection {
-                title: Translation.tr("Notification indicator style")
-                icon: "notifications"
-
-                ConfigSelectionArray {
-                    currentValue: Config.options.bar.styles.notification
-                    onSelected: newValue => { Config.options.bar.styles.notification = newValue; }
-                    options: [
-                        { displayName: Translation.tr("Default"),    icon: "style",     value: "default" },
-                        { displayName: Translation.tr("Expressive"), icon: "fluid_med", value: "expressive" }
-                    ]
-                }
-            }
-
-            ContentSubsection {
-                title: Translation.tr("Notification position")
-                icon: "place"
-
-                ConfigSelectionArray {
-                    currentValue: Config.options.notifications.position
-                    onSelected: newValue => { Config.options.notifications.position = newValue; }
-                    options: [
-                        { displayName: Translation.tr("Top Left"),     icon: "north_west", value: "top_left" },
-                        { displayName: Translation.tr("Top Right"),    icon: "north_east", value: "top_right" },
-                        { displayName: Translation.tr("Bottom Left"),  icon: "south_west", value: "bottom_left" },
-                        { displayName: Translation.tr("Bottom Right"), icon: "south_east", value: "bottom_right" }
-                    ]
-                }
-            }
-        }
 
         ContentSection {
             title: Translation.tr("Game Overlays")
@@ -119,22 +37,26 @@ Item {
 
                 RippleButton {
                     id: gameOverlayRipple
+
                     Layout.fillWidth: true
                     implicitHeight: gameOverlayRow.implicitHeight + 32
                     buttonRadius: Appearance.rounding.full
-                    
                     colBackground: Appearance.colors.colTertiaryContainer
                     colBackgroundHover: Appearance.colors.colTertiaryContainerHover
                     colRipple: Appearance.colors.colTertiaryContainerActive
+                    onClicked: {
+                        overlaysConfigRoot.activeSubPage = Qt.resolvedUrl("widgets/GameOverlayConfig.qml");
+                    }
 
                     contentItem: RowLayout {
                         id: gameOverlayRow
+
                         spacing: 12
                         anchors.fill: parent
                         anchors.margins: 16
-                        
+
                         MaterialShapeWrappedMaterialSymbol {
-                            text: "settings"
+                            text: "sports_esports"
                             shape: MaterialShape.Shape.Circle
                             iconSize: 18
                             padding: 6
@@ -142,14 +64,26 @@ Item {
                             color: Appearance.colors.colTertiary
                             colSymbol: Appearance.colors.colOnTertiary
                         }
-                        
-                        StyledText {
+
+                        ColumnLayout {
                             Layout.fillWidth: true
-                            text: Translation.tr("Game Overlay Options")
-                            font.pixelSize: Appearance.font.pixelSize.medium
-                            color: Appearance.colors.colOnTertiaryContainer
+                            spacing: 1
+
+                            StyledText {
+                                text: Translation.tr("Game Overlay Options")
+                                font.pixelSize: Appearance.font.pixelSize.normal
+                                font.family: Appearance.font.family.title
+                                color: Appearance.colors.colOnTertiaryContainer
+                            }
+
+                            StyledText {
+                                text: Translation.tr("Crosshair, Media overlay, Notes, Discord voice & Floating image")
+                                font.pixelSize: Appearance.font.pixelSize.smaller
+                                color: Appearance.colors.colOnTertiaryContainer
+                                opacity: 0.8
+                            }
                         }
-                        
+
                         MaterialSymbol {
                             text: "arrow_forward"
                             iconSize: Appearance.font.pixelSize.large
@@ -157,104 +91,327 @@ Item {
                         }
                     }
 
-                    onClicked: {
-                        overlaysConfigRoot.activeSubPage = Qt.resolvedUrl("widgets/GameOverlayConfig.qml");
+                    StyledToolTip {
+                        text: Translation.tr("Open advanced in-game HUD and widget overlay settings")
                     }
                 }
             }
         }
 
         ContentSection {
-            title: Translation.tr("Media Overlay")
-            icon: "play_circle"
+            title: Translation.tr("On-Screen Display (OSD)")
+            icon: "desktop_windows"
 
-            ColumnLayout {
+            ConfigSwitch {
+                buttonIcon: "visibility"
+                text: Translation.tr("Enable OSD")
+                checked: Config.options.osd.enable
+                onCheckedChanged: {
+                    Config.options.osd.enable = checked;
+                }
+                StyledToolTip {
+                    text: Translation.tr("Display visual indicator when changing volume, brightness, or gamma")
+                }
+            }
+
+            ConfigSwitch {
+                buttonIcon: "fullscreen"
+                text: Translation.tr("Hide OSD when fullscreen")
+                checked: Config.options.osd.hideWhenFullscreen
+                onCheckedChanged: {
+                    Config.options.osd.hideWhenFullscreen = checked;
+                }
+                StyledToolTip {
+                    text: Translation.tr("Prevent OSD from appearing over fullscreen games and media players")
+                }
+            }
+
+            NoticeBox {
                 Layout.fillWidth: true
-                spacing: 4
+                visible: Config.options.sidebar.sidebarStyle === "connect"
+                materialIcon: "phone_android"
+                text: Translation.tr("OSD customization is only available in Default shell mode. The Connect mode uses its own native OSD.")
 
-                ConfigSwitch {
-                    buttonIcon: "linear_scale"
-                    text: Translation.tr("Show slider")
-                    checked: Config.options.overlay.media.showSlider
-                    onCheckedChanged: {
-                        Config.options.overlay.media.showSlider = checked;
-                    }
+                ShortcutBox {
+                    targetPageId: "bar"
+                    targetSectionTitle: Translation.tr("Shell mode")
+                    materialIcon: "arrow_forward"
+                    text: Translation.tr("Go to Shell mode settings")
+                    linkText: Translation.tr("Go there")
                 }
-                ConfigSpinBox {
-                    icon: "opacity"
-                    text: Translation.tr("Background opacity %")
-                    value: Config.options.overlay.media.backgroundOpacityPercentage
-                    from: 0
-                    to: 100
-                    stepSize: 5
-                    onValueChanged: {
-                        Config.options.overlay.media.backgroundOpacityPercentage = value;
-                    }
+            }
+
+            // Real OSD Live Preview Card
+            OsdPreviewCard {
+                Layout.fillWidth: true
+                enabled: Config.options.sidebar.sidebarStyle !== "connect"
+                opacity: Config.options.sidebar.sidebarStyle !== "connect" ? 1.0 : 0.4
+            }
+
+            // Android Style Exclusive: OSD Position (Moved ABOVE OSD Style as requested)
+            ContentSubsection {
+                title: Translation.tr("OSD Position")
+                icon: "align_horizontal_right"
+                Layout.fillWidth: true
+                visible: (Config.options.osd.style ?? "default") === "default"
+                enabled: Config.options.sidebar.sidebarStyle !== "connect"
+                opacity: Config.options.sidebar.sidebarStyle !== "connect" ? 1.0 : 0.4
+
+                OsdPositionPicker {
+                    Layout.fillWidth: true
+                    enabled: Config.options.sidebar.sidebarStyle !== "connect"
                 }
-                ConfigSwitch {
-                    buttonIcon: "gradient"
-                    text: Translation.tr("Use lyrics gradient masking")
-                    checked: Config.options.overlay.media.useGradientMask
-                    onCheckedChanged: {
-                        Config.options.overlay.media.useGradientMask = checked;
+            }
+
+            // OSD Style Selector
+            ContentSubsection {
+                title: Translation.tr("OSD Style")
+                icon: "tune"
+                Layout.fillWidth: true
+                enabled: Config.options.sidebar.sidebarStyle !== "connect"
+                opacity: Config.options.sidebar.sidebarStyle !== "connect" ? 1.0 : 0.4
+
+                ConfigSelectionArray {
+                    enabled: Config.options.sidebar.sidebarStyle !== "connect"
+                    currentValue: Config.options.osd.style ?? "default"
+                    onSelected: (newValue) => {
+                        Config.options.osd.style = newValue;
+                        overlaysConfigRoot.triggerRealOsd();
                     }
+                    options: [{
+                        "displayName": Translation.tr("Android"),
+                        "icon": "smartphone",
+                        "tooltip": Translation.tr("Edge vertical slider bar"),
+                        "value": "default"
+                    }, {
+                        "displayName": Translation.tr("Minimal"),
+                        "icon": "horizontal_rule",
+                        "tooltip": Translation.tr("Compact horizontal floating pill"),
+                        "value": "minimalist"
+                    }, {
+                        "displayName": Translation.tr("Material"),
+                        "icon": "interests",
+                        "tooltip": Translation.tr("Expressive Material 3 card with shaped glyphs"),
+                        "value": "material"
+                    }]
                 }
-                ConfigSpinBox {
-                    icon: "format_size"
-                    text: Translation.tr("Lyrics font size")
-                    value: Config.options.overlay.media.lyricSize
-                    from: 10
-                    to: 100
-                    stepSize: 1
-                    onValueChanged: {
-                        Config.options.overlay.media.lyricSize = value;
+            }
+
+            // Material 3 Exclusive Options
+            ContentSubsectionLabel {
+                text: Translation.tr("Material OSD Options")
+                visible: Config.options.osd.style === "material"
+                enabled: Config.options.sidebar.sidebarStyle !== "connect"
+                opacity: enabled ? 1.0 : 0.4
+                Layout.topMargin: 4
+            }
+
+            ConfigSwitch {
+                visible: Config.options.osd.style === "material"
+                enabled: Config.options.sidebar.sidebarStyle !== "connect"
+                opacity: enabled ? 1.0 : 0.4
+                buttonIcon: "compress"
+                text: Translation.tr("Minimal variant")
+                checked: Config.options.osd.material.minimal
+                onCheckedChanged: {
+                    Config.options.osd.material.minimal = checked;
+                    overlaysConfigRoot.triggerRealOsd();
+                }
+                StyledToolTip {
+                    text: Translation.tr("Compact single-line Material 3 slider layout")
+                }
+            }
+
+            ConfigSwitch {
+                visible: Config.options.osd.style === "material"
+                enabled: Config.options.sidebar.sidebarStyle !== "connect"
+                opacity: enabled ? 1.0 : 0.4
+                buttonIcon: "shapes"
+                text: Translation.tr("Shaped value labels")
+                checked: Config.options.osd.material.shapedValues
+                onCheckedChanged: {
+                    Config.options.osd.material.shapedValues = checked;
+                    overlaysConfigRoot.triggerRealOsd();
+                }
+                StyledToolTip {
+                    text: Translation.tr("Use geometric shape background containers around icons")
+                }
+            }
+
+            ConfigSwitch {
+                visible: Config.options.osd.style === "material"
+                enabled: Config.options.sidebar.sidebarStyle !== "connect"
+                opacity: enabled ? 1.0 : 0.4
+                buttonIcon: "circle"
+                text: Translation.tr("Circled shapes")
+                checked: Config.options.osd.material.circledShapes
+                onCheckedChanged: {
+                    Config.options.osd.material.circledShapes = checked;
+                    overlaysConfigRoot.triggerRealOsd();
+                }
+                StyledToolTip {
+                    text: Translation.tr("Force circular shape container instead of flower/star shapes")
+                }
+            }
+
+            ConfigSwitch {
+                visible: Config.options.osd.style === "material"
+                enabled: Config.options.sidebar.sidebarStyle !== "connect"
+                opacity: enabled ? 1.0 : 0.4
+                buttonIcon: "rotate_right"
+                text: Translation.tr("Rotate shapes when changing values")
+                checked: Config.options.osd.material.rotateShape
+                onCheckedChanged: {
+                    Config.options.osd.material.rotateShape = checked;
+                    overlaysConfigRoot.triggerRealOsd();
+                }
+                StyledToolTip {
+                    text: Translation.tr("Rotate geometric shape glyph dynamically with value changes")
+                }
+            }
+
+            // Common Options (Timeout)
+            ConfigSlider {
+                enabled: Config.options.sidebar.sidebarStyle !== "connect"
+                opacity: Config.options.sidebar.sidebarStyle !== "connect" ? 1.0 : 0.4
+                buttonIcon: "schedule"
+                text: Translation.tr("OSD Timeout")
+                usePercentTooltip: false
+                tooltipContent: `${(value / 1000).toFixed(1)}s`
+                from: 1000
+                to: 5000
+                stepSize: 500
+                value: Config.options.osd.timeout ?? 3000
+                onValueChanged: {
+                    Config.options.osd.timeout = value;
+                }
+            }
+        }
+
+        ContentSection {
+            title: Translation.tr("On-screen Keyboard")
+            icon: "keyboard"
+
+            KeyboardShortcutBox {
+                Layout.fillWidth: true
+                text: Translation.tr("Toggle On-Screen Keyboard")
+                keys: ["Super", "K"]
+            }
+
+            ConfigSwitch {
+                buttonIcon: "keyboard"
+                text: Translation.tr("Show on-screen keyboard")
+                checked: GlobalStates.oskOpen
+                onCheckedChanged: {
+                    GlobalStates.oskOpen = checked;
+                }
+                StyledToolTip {
+                    text: Translation.tr("Open or close the virtual keyboard on screen")
+                }
+            }
+
+            ContentSubsection {
+                title: Translation.tr("Keyboard Style")
+                icon: "keyboard"
+                Layout.fillWidth: true
+
+                ConfigSelectionArray {
+                    currentValue: Config.options.osk.style ?? "deck"
+                    onSelected: (newValue) => {
+                        Config.options.osk.style = newValue;
                     }
+                    options: [{
+                        "displayName": Translation.tr("Deck"),
+                        "icon": "keyboard",
+                        "tooltip": Translation.tr("Spans the bottom of the screen"),
+                        "value": "deck"
+                    }, {
+                        "displayName": Translation.tr("Classic"),
+                        "icon": "keyboard_alt",
+                        "tooltip": Translation.tr("Floats above the screen edge"),
+                        "value": "classic"
+                    }]
+                }
+            }
+
+            ContentSubsection {
+                title: Translation.tr("Layout")
+                icon: "language"
+                Layout.fillWidth: true
+
+                ConfigSelectionArray {
+                    currentValue: Config.options.osk.layout ?? "auto"
+                    onSelected: (newValue) => {
+                        Config.options.osk.layout = newValue;
+                    }
+                    options: [{
+                        "displayName": Translation.tr("Auto"),
+                        "icon": "autorenew",
+                        "tooltip": Translation.tr("Follows the keyboard layout you are typing in"),
+                        "value": "auto"
+                    }, {
+                        "displayName": Translation.tr("French"),
+                        "value": "French"
+                    }, {
+                        "displayName": Translation.tr("English"),
+                        "value": "English (US)"
+                    }, {
+                        "displayName": Translation.tr("German"),
+                        "value": "German"
+                    }, {
+                        "displayName": Translation.tr("Russian"),
+                        "value": "Russian"
+                    }]
+                }
+            }
+
+            ConfigSpinBox {
+                enabled: (Config.options.osk.style ?? "deck") === "deck"
+                opacity: enabled ? 1.0 : 0.4
+                icon: "height"
+                text: Translation.tr("Height (% of the screen)")
+                value: Config.options.osk.heightPercent
+                from: 15
+                to: 60
+                stepSize: 1
+                onValueChanged: {
+                    Config.options.osk.heightPercent = value;
+                }
+            }
+
+            ConfigSwitch {
+                enabled: (Config.options.osk.style ?? "deck") === "deck"
+                opacity: enabled ? 1.0 : 0.4
+                buttonIcon: "text_fields"
+                text: Translation.tr("Show shift and AltGr glyphs")
+                checked: Config.options.osk.secondaryGlyphs
+                onCheckedChanged: {
+                    Config.options.osk.secondaryGlyphs = checked;
+                }
+                StyledToolTip {
+                    text: Translation.tr("Display secondary key characters (Shift and AltGr) on keycaps")
+                }
+            }
+
+            ConfigSwitch {
+                buttonIcon: "touch_app"
+                text: Translation.tr("Show automatically on touch")
+                checked: Config.options.osk.autoShow.enable
+                configPage: Qt.resolvedUrl("widgets/OnScreenKeyboardConfig.qml")
+                onCheckedChanged: {
+                    Config.options.osk.autoShow.enable = checked;
+                }
+                StyledToolTip {
+                    text: Translation.tr("Configure automatic virtual keyboard popup behavior for touchscreen and pen input")
                 }
             }
         }
     }
 
-    Item {
+    ConfigSubPageHost {
         id: subPageOverlay
-        width: parent.width
-        height: parent.height
-        y: 0
+
+        anchors.fill: parent
         z: 10
-
-        property bool isOpen: overlaysConfigRoot.activeSubPage.toString() !== ""
-        property bool overlayActive: isOpen
-
-        onXChanged: {
-            if (!isOpen && x >= subPageOverlay.width - 1)
-                overlayActive = false;
-        }
-        onIsOpenChanged: {
-            if (isOpen) overlayActive = true;
-        }
-
-        x: isOpen ? 0 : subPageOverlay.width
-
-        Behavior on x {
-            NumberAnimation {
-                duration: Appearance.animation.elementMove.duration
-                easing.type: Appearance.animation.elementMove.type
-                easing.bezierCurve: Appearance.animation.elementMove.bezierCurve
-            }
-        }
-
-        enabled: isOpen
-
-        Loader {
-            id: subPageLoader
-            anchors.fill: parent
-            source: overlaysConfigRoot.activeSubPage
-            active: subPageOverlay.overlayActive
-
-            onLoaded: {
-                item.goBack.connect(function() {
-                    overlaysConfigRoot.activeSubPage = "";
-                });
-            }
-        }
     }
 }

@@ -21,13 +21,25 @@ LazyLoader {
     readonly property real layoutScale: {
         if (screenHeight <= 0 || !root.contentItem)
             return 1.0;
+        var baseScale = Math.max(0.75, Math.min(1.5, screenHeight / 1080.0));
         var barSpace = Config.options.bar.vertical ? 0 : Appearance.sizes.barHeight;
         var maxAllowedHeight = screenHeight - barSpace - Appearance.sizes.elevationMargin * 2 - 40;
-        var naturalHeight = root.contentItem.implicitHeight + 20;
-        if (naturalHeight > maxAllowedHeight) {
-            return Math.max(0.6, maxAllowedHeight / naturalHeight);
+        var maxAllowedWidth = (screenWidth > 0 ? screenWidth : 1920) * 0.9;
+        
+        var userMultiplier = Config.options?.bar?.tooltips?.popupScaleMultiplier ?? 1.0;
+        var scale = baseScale * userMultiplier;
+        // Measure with the actual candidate scale. Using baseScale here made
+        // the size guard ignore the user multiplier and allowed oversized popup
+        // surfaces to exceed the monitor's safe bounds.
+        var scaledHeight = (root.contentItem.implicitHeight + 20) * scale;
+        var scaledWidth = (root.contentItem.implicitWidth + 20) * scale;
+        if (scaledHeight > maxAllowedHeight) {
+            scale = Math.min(scale, Math.max(0.5, maxAllowedHeight / (root.contentItem.implicitHeight + 20)));
         }
-        return 1.0;
+        if (scaledWidth > maxAllowedWidth) {
+            scale = Math.min(scale, Math.max(0.5, maxAllowedWidth / (root.contentItem.implicitWidth + 20)));
+        }
+        return scale;
     }
     property real popupBackgroundMargin: 0
     property int popupRadius: Appearance.rounding.large
@@ -35,32 +47,64 @@ LazyLoader {
     property bool animateHeight: true
     property bool stickyHover: false
     property int keyboardFocus: WlrKeyboardFocus.None
-    
+
+    property bool customPosition: false
+    property bool anchorRight: false
+    property bool anchorLeft: false
+    property bool anchorTop: false
+    property bool anchorBottom: false
+    property int customMarginLeft: 0
+    property int customMarginRight: 0
+    property int customMarginTop: 0
+    property int customMarginBottom: 0
+
     // Expose active state to child elements so they can trigger animations,
     // exactly like WeatherPopup does for HourlyForecast.
     readonly property bool opened: _computedActive && !root._isClosing
 
     property bool _popupHovered: false
     property bool _stickyActive: false
-    property bool _targetHovered: hoverTarget ? hoverTarget.containsMouse : false
+    property bool forceClick: false
+    // Set false when the user of this popup runs its own focus grab. Hyprland honours only
+    // one grab per client, so a second one silently clears the first.
+    property bool selfDismiss: true
+    property bool _targetHovered: hoverTarget ? (hoverTarget.containsMouse !== undefined ? hoverTarget.containsMouse : (hoverTarget.hovered !== undefined ? hoverTarget.hovered : false)) : false
     property bool _clickActive: false
     property bool _isClosing: false
+    property bool _reopenPending: false
 
-    readonly property bool _computedActive: Config.options.bar.tooltips.clickToShow ? _clickActive : (stickyHover ? _stickyActive : (hoverTarget && hoverTarget.containsMouse))
+    readonly property bool _computedActive: Config.options.bar.tooltips.enablePopups && ((Config.options.bar.tooltips.clickToShow || forceClick) ? _clickActive : (stickyHover ? _stickyActive : (_targetHovered && _openDebounced)))
+
+    property bool _openDebounced: false
 
     active: _computedActive || _isClosing
 
     on_ComputedActiveChanged: {
         if (!_computedActive) {
             _isClosing = true;
+            _reopenPending = false;
+        } else if (_isClosing) {
+            // Do not reverse a close halfway through. Child popup animations may
+            // still have queued callbacks from the previous entrance; wait for a
+            // clean progress=0 reset and reopen the instance afterward.
+            _reopenPending = true;
         } else {
             _isClosing = false;
         }
     }
 
     property QtObject _timers: QtObject {
+        property Timer openDebounce: Timer {
+            interval: 60
+            repeat: false
+            onTriggered: {
+                if (root._targetHovered && !root._isClosing) {
+                    root._openDebounced = true;
+                }
+            }
+        }
         property Timer grace: Timer {
-            interval: 100
+            interval: 100 + Math.max(0, (Config.options && Config.options.bar && Config.options.bar.tooltips && Config.options.bar.tooltips.closeDelay) ? Config.options.bar.tooltips.closeDelay : 0)
             onTriggered: {
                 root._popupHovered = false;
                 root._stickyActive = false;
@@ -68,9 +112,27 @@ LazyLoader {
         }
     }
 
+    // Dismiss the popup regardless of which mode opened it (click, sticky hover or plain hover).
+    function close() {
+        _clickActive = false;
+        _stickyActive = false;
+        _openDebounced = false;
+        _popupHovered = false;
+        _timers.openDebounce.stop();
+        _timers.grace.stop();
+    }
+
     function _evaluateStickyState() {
         if (!stickyHover)
             return;
+
+        // Neither the popup body nor the source widget may reverse a close in
+        // progress. The source widget can request a queued re-open separately.
+        if (_isClosing) {
+            if (_targetHovered)
+                _reopenPending = true;
+            return;
+        }
 
         if (_targetHovered || _popupHovered) {
             _stickyActive = true;
@@ -80,9 +142,27 @@ LazyLoader {
         }
     }
 
+    function _queueReopenFromTarget() {
+        if (!_isClosing)
+            return;
+
+        _timers.grace.stop();
+        _reopenPending = true;
+    }
+
     on_TargetHoveredChanged: {
-        if (Config.options.bar.tooltips.clickToShow) {
-            if (_targetHovered && !root._clickActive) {
+        if (_targetHovered) {
+            if (_isClosing)
+                _queueReopenFromTarget();
+            _timers.openDebounce.restart();
+        } else {
+            _timers.openDebounce.stop();
+            _openDebounced = false;
+            _reopenPending = false;
+        }
+
+        if (Config.options.bar.tooltips.clickToShow || forceClick) {
+            if (_targetHovered && !root._clickActive && !root._isClosing) {
                 root._clickActive = true;
             }
         } else {
@@ -94,6 +174,8 @@ LazyLoader {
         if (!active) {
             _popupHovered = false;
             _isClosing = false;
+            _openDebounced = false;
+            _timers.openDebounce.stop();
             _timers.grace.stop();
         }
     }
@@ -106,16 +188,28 @@ LazyLoader {
         readonly property real screenWidth: popupWindow.screen?.width ?? 0
         readonly property real screenHeight: popupWindow.screen?.height ?? 0
 
-        anchors.left: !Config.options.bar.vertical || (Config.options.bar.vertical && !Config.options.bar.bottom)
-        anchors.right: Config.options.bar.vertical && Config.options.bar.bottom
-        anchors.top: Config.options.bar.vertical || (!Config.options.bar.vertical && !Config.options.bar.bottom)
-        anchors.bottom: !Config.options.bar.vertical && Config.options.bar.bottom
+        anchors.left: root.customPosition ? root.anchorLeft : (!Config.options.bar.vertical || (Config.options.bar.vertical && !Config.options.bar.bottom))
+        anchors.right: root.customPosition ? root.anchorRight : (Config.options.bar.vertical && Config.options.bar.bottom)
+        anchors.top: root.customPosition ? root.anchorTop : (Config.options.bar.vertical || (!Config.options.bar.vertical && !Config.options.bar.bottom))
+        anchors.bottom: root.customPosition ? root.anchorBottom : (!Config.options.bar.vertical && Config.options.bar.bottom)
 
         implicitWidth: popupBackground.targetWidth + Appearance.sizes.elevationMargin * 2 + root.popupBackgroundMargin
-        implicitHeight: popupBackground.targetHeight + Appearance.sizes.elevationMargin * 2 + root.popupBackgroundMargin
+        implicitHeight: popupBackground._windowHeight + Appearance.sizes.elevationMargin * 2 + root.popupBackgroundMargin
+
+        // The input region must not follow the open animation. popupBackground lives inside
+        // animContainer, which carries a Translate transform, and a transform change does not
+        // emit the geometry signals Region listens to — so the committed region can stay stuck
+        // at the animation's starting offset and swallow clicks aimed at the popup's contents.
+        Item {
+            id: maskRect
+            x: popupBackground.x
+            y: popupBackground.y
+            width: popupBackground.width
+            height: popupBackground.height
+        }
 
         mask: Region {
-            item: popupBackground
+            item: maskRect
         }
 
         exclusionMode: ExclusionMode.Ignore
@@ -123,6 +217,9 @@ LazyLoader {
 
         margins {
             left: {
+                if (root.customPosition) {
+                    return root.customMarginLeft;
+                }
                 if (!Config.options.bar.vertical) {
                     if (!root.hoverTarget || !root.QsWindow)
                         return 0;
@@ -136,6 +233,9 @@ LazyLoader {
             }
 
             top: {
+                if (root.customPosition) {
+                    return root.customMarginTop;
+                }
                 if (!Config.options.bar.vertical) {
                     return Appearance.sizes.barHeight;
                 }
@@ -148,17 +248,19 @@ LazyLoader {
                 return Math.max(minY, Math.min(maxY, centeredY));
             }
 
-            right: Appearance.sizes.verticalBarWidth
-            bottom: Appearance.sizes.barHeight
+            right: root.customPosition ? root.customMarginRight : Appearance.sizes.verticalBarWidth
+            bottom: root.customPosition ? root.customMarginBottom : Appearance.sizes.barHeight
         }
 
         WlrLayershell.namespace: "quickshell:popup"
         WlrLayershell.layer: WlrLayer.Overlay
 
+        property bool _dismissGrabArmed: false
+
         HyprlandFocusGrab {
             id: dismissGrab
             windows: [popupWindow]
-            active: false
+            active: root.selfDismiss && (Config.options.bar.tooltips.clickToShow || root.forceClick) && root._computedActive && popupWindow._dismissGrabArmed
             onCleared: () => {
                 root._clickActive = false;
             }
@@ -171,7 +273,7 @@ LazyLoader {
         onAnimProgressChanged: updateChildrenAnimation()
 
         function updateChildrenAnimation() {
-            // Keep children animation clean and empty since they will animate themselves 
+            // Keep children animation clean and empty since they will animate themselves
             // directly using the root.active property, matching HourlyForecast's pattern.
         }
 
@@ -180,12 +282,14 @@ LazyLoader {
         readonly property real slideOffset: 35
 
         readonly property real slideX: {
-            if (!isBarVertical) return 0;
+            if (!isBarVertical)
+                return 0;
             return isBarBottom ? slideOffset : -slideOffset;
         }
 
         readonly property real slideY: {
-            if (isBarVertical) return 0;
+            if (isBarVertical)
+                return 0;
             return isBarBottom ? slideOffset : -slideOffset;
         }
 
@@ -203,8 +307,11 @@ LazyLoader {
 
         SequentialAnimation {
             id: openAnimSeq
-            PauseAnimation { duration: 50 }
+            PauseAnimation {
+                duration: 50
+            }
             NumberAnimation {
+                id: openProgressAnim
                 target: popupWindow
                 property: "animProgress"
                 from: 0.0
@@ -231,7 +338,30 @@ LazyLoader {
         Timer {
             id: destroyTimer
             interval: 30
-            onTriggered: root._isClosing = false
+            onTriggered: {
+                root._isClosing = false;
+                if (root._reopenPending)
+                    reopenAfterClose.start();
+            }
+        }
+
+        Timer {
+            id: reopenAfterClose
+            interval: 1
+            onTriggered: {
+                if (!root._reopenPending)
+                    return;
+
+                root._reopenPending = false;
+                if (root._targetHovered || Config.options.bar.tooltips.clickToShow || root.forceClick) {
+                    if (Config.options.bar.tooltips.clickToShow || root.forceClick)
+                        root._clickActive = true;
+                    else if (root.stickyHover)
+                        root._stickyActive = true;
+                    else
+                        root._openDebounced = true;
+                }
+            }
         }
 
         Connections {
@@ -249,27 +379,36 @@ LazyLoader {
                     openAnimSeq.stop();
                     closeAnim.from = popupWindow.animProgress;
                     closeAnim.start();
-                } else {
+                } else if (root._computedActive) {
                     closeAnim.stop();
                     destroyTimer.stop();
                     popupWindow.animProgress = 0.0;
                     openAnimSeq.start();
                 }
             }
+            function on_ComputedActiveChanged() {
+                if (root._computedActive && root.selfDismiss) {
+                    popupWindow._dismissGrabArmed = false;
+                    dismissGrabArmTimer.restart();
+                } else {
+                    dismissGrabArmTimer.stop();
+                    popupWindow._dismissGrabArmed = false;
+                }
+            }
         }
 
         Component.onCompleted: {
-            if (Config.options.bar.tooltips.clickToShow) {
-                grabDelayTimer.start();
+            if (root.selfDismiss && Config.options.bar.tooltips.clickToShow) {
+                dismissGrabArmTimer.restart();
             }
             popupWindow.animProgress = 0.0;
             openAnimSeq.start();
         }
 
         Timer {
-            id: grabDelayTimer
+            id: dismissGrabArmTimer
             interval: 250
-            onTriggered: dismissGrab.active = true
+            onTriggered: popupWindow._dismissGrabArmed = true
         }
 
         Item {
@@ -282,15 +421,12 @@ LazyLoader {
                 y: popupWindow.slideY * (1.0 - popupWindow.animProgress)
             }
 
-            layer.enabled: true
-            layer.effect: MultiEffect {
-                blurEnabled: true
-                blurMax: 128.0
-                blur: (1.0 - popupWindow.animProgress) * 1.0
-            }
-
+            // Keep the popup vector/text content on the scene graph. Do not put
+            // it in an FBO: scaling an FBO pixelates text, Material Symbols,
+            // and thin shapes on monitors with fractional scale.
             StyledRectangularShadow {
                 target: popupBackground
+                visible: !Config.options.appearance.transparency.popups
             }
 
             Rectangle {
@@ -305,25 +441,32 @@ LazyLoader {
                 property int elevation: Appearance.sizes.elevationMargin
 
                 property real _commitHeight: 0
+                property real _windowHeight: 0
                 property bool _heightReady: false
 
                 onTargetHeightChanged: {
                     _commitHeight = targetHeight;
+                    _windowHeight = targetHeight;
                 }
 
                 Component.onCompleted: {
                     _commitHeight = targetHeight;
+                    _windowHeight = targetHeight;
                     Qt.callLater(function () {
                         popupBackground._heightReady = true;
                     });
                 }
 
                 Behavior on _commitHeight {
-                    enabled: popupBackground._heightReady
-                    SmoothedAnimation {
-                        duration: 200
-                        easing: Easing.OutQuad
-                    }
+                    enabled: popupBackground._heightReady && root.animate && root.animateHeight
+                        && root.opened && popupWindow.animProgress >= 1.0
+                    animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
+                }
+
+                Behavior on _windowHeight {
+                    enabled: popupBackground._heightReady && root.animate && root.animateHeight
+                        && root.opened && popupWindow.animProgress >= 1.0
+                    animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
                 }
 
                 anchors {
@@ -343,6 +486,8 @@ LazyLoader {
 
                 width: targetWidth
                 height: {
+                    if (!root.animateHeight)
+                        return targetHeight;
                     if (!root.animate || !root.contentItem || !heroItem || targetHeight <= heroHeight + margin * 2)
                         return _commitHeight;
                     return (heroHeight + margin * 2) + (_commitHeight - (heroHeight + margin * 2)) * popupWindow.animProgress;
@@ -350,6 +495,9 @@ LazyLoader {
 
                 color: Config.options.appearance.transparency.popups ? Appearance.colors.colLayer0 : Appearance.m3colors.m3surfaceContainer
                 radius: root.popupRadius
+                // During close the surface shrinks before the content tree is destroyed.
+                // Clip that subtree to the same animated bounds so cards cannot spill out.
+                clip: root._isClosing
 
                 Item {
                     id: contentContainer
@@ -357,100 +505,150 @@ LazyLoader {
                     width: root.contentItem ? root.contentItem.implicitWidth : 0
                     height: root.contentItem ? root.contentItem.implicitHeight : 0
 
+                    // Keep the content exit synchronized with the surface close. Scale
+                    // by the currently available surface height so the cards follow the
+                    // same contraction instead of remaining at their full size.
+                    readonly property real closeScale: root._isClosing
+                        ? Math.max(0.0, Math.min(1.0, popupBackground.height / Math.max(1.0, height)))
+                        : 1.0
+                    readonly property real closeOriginX: {
+                        if (root.customPosition) {
+                            if (root.anchorLeft)
+                                return 0;
+                            if (root.anchorRight)
+                                return width;
+                        }
+                        if (popupBackground.isVertical)
+                            return popupBackground.isBottom ? width : 0;
+                        return width / 2;
+                    }
+                    readonly property real closeOriginY: {
+                        if (root.customPosition) {
+                            if (root.anchorTop)
+                                return 0;
+                            if (root.anchorBottom)
+                                return height;
+                        }
+                        if (popupBackground.isVertical)
+                            return height / 2;
+                        return popupBackground.isBottom ? height : 0;
+                    }
+
+                    // Keep the layout scale centered; only the close transform should
+                    // travel toward the bar, so opening geometry remains unchanged.
                     scale: root.layoutScale
+                    opacity: root._isClosing ? closeScale : 1.0
                     transformOrigin: Item.Center
+                    transform: Scale {
+                        origin.x: contentContainer.closeOriginX
+                        origin.y: contentContainer.closeOriginY
+                        xScale: contentContainer.closeScale
+                        yScale: contentContainer.closeScale
+                    }
                     clip: false
 
-                Component.onCompleted: {
-                    if (root.contentItem) {
-                        root.contentItem.parent = contentContainer;
-                        root.contentItem.anchors.centerIn = undefined;
-                        root.contentItem.anchors.top = undefined;
-                        root.contentItem.anchors.bottom = undefined;
-                        root.contentItem.anchors.left = undefined;
-                        root.contentItem.anchors.right = undefined;
-                        root.contentItem.anchors.fill = contentContainer;
+                    // contentItem is owned by root, which is a LazyLoader (not an Item), so it
+                    // outlives this window. Detach it before the window's item tree is torn down,
+                    // otherwise it keeps a dangling visual parent and anchors into freed items.
+                    Component.onDestruction: {
+                        if (!root || !root.contentItem)
+                            return;
+                        root.contentItem.anchors.fill = undefined;
+                        root.contentItem.parent = null;
+                    }
 
-                        function recalculateDelays() {
-                            if (!root || !root.contentItem) return;
-                            
-                            let targetItem = root.contentItem;
-                            if (root.contentItem.children.length === 1) {
-                                let firstChild = root.contentItem.children[0];
-                                let name = firstChild.toString();
-                                if (name.includes("Layout") || firstChild.hasOwnProperty("spacing")) {
-                                    targetItem = firstChild;
-                                }
-                            }
-                            
-                            let visibleChildren = [];
-                            for (let i = 0; i < targetItem.children.length; i++) {
-                                let child = targetItem.children[i];
-                                if (child && child.hasOwnProperty("visible") && child.visible) {
-                                    visibleChildren.push(child);
-                                }
-                            }
-                            
-                            let delays = [];
-                            let total = visibleChildren.length;
-                            for (let i = 0; i < targetItem.children.length; i++) {
-                                let child = targetItem.children[i];
-                                let visIdx = visibleChildren.indexOf(child);
-                                if (visIdx !== -1) {
-                                    delays.push(visIdx / Math.max(1, total));
-                                } else {
-                                    delays.push(0);
-                                }
-                            }
-                            popupWindow.childDelays = delays;
-                            popupWindow.updateChildrenAnimation();
-                        }
+                    Component.onCompleted: {
+                        if (root.contentItem) {
+                            root.contentItem.parent = contentContainer;
+                            root.contentItem.anchors.centerIn = undefined;
+                            root.contentItem.anchors.top = undefined;
+                            root.contentItem.anchors.bottom = undefined;
+                            root.contentItem.anchors.left = undefined;
+                            root.contentItem.anchors.right = undefined;
+                            root.contentItem.anchors.fill = contentContainer;
 
-                        recalculateDelays();
-                        
-                        // Listen to hierarchy changes to connect and recalculate delays properly
-                        function setupConnections() {
-                            if (!root || !root.contentItem) return;
-                            let targetItem = root.contentItem;
-                            if (root.contentItem.children.length === 1) {
-                                let firstChild = root.contentItem.children[0];
-                                let name = firstChild.toString();
-                                if (name.includes("Layout") || firstChild.hasOwnProperty("spacing")) {
-                                    targetItem = firstChild;
+                            function recalculateDelays() {
+                                if (!root || !root.contentItem)
+                                    return;
+
+                                let targetItem = root.contentItem;
+                                if (root.contentItem.children.length === 1) {
+                                    let firstChild = root.contentItem.children[0];
+                                    let name = firstChild.toString();
+                                    if (name.includes("Layout") || firstChild.hasOwnProperty("spacing")) {
+                                        targetItem = firstChild;
+                                    }
                                 }
-                            }
-                            
-                            for (let i = 0; i < targetItem.children.length; i++) {
-                                let child = targetItem.children[i];
-                                if (child && child.hasOwnProperty("visibleChanged")) {
-                                    try {
-                                        child.visibleChanged.disconnect(recalculateDelays);
-                                    } catch(e) {}
-                                    child.visibleChanged.connect(recalculateDelays);
+
+                                let visibleChildren = [];
+                                for (let i = 0; i < targetItem.children.length; i++) {
+                                    let child = targetItem.children[i];
+                                    if (child && child.hasOwnProperty("visible") && child.visible) {
+                                        visibleChildren.push(child);
+                                    }
                                 }
+
+                                let delays = [];
+                                let total = visibleChildren.length;
+                                for (let i = 0; i < targetItem.children.length; i++) {
+                                    let child = targetItem.children[i];
+                                    let visIdx = visibleChildren.indexOf(child);
+                                    if (visIdx !== -1) {
+                                        delays.push(visIdx / Math.max(1, total));
+                                    } else {
+                                        delays.push(0);
+                                    }
+                                }
+                                popupWindow.childDelays = delays;
+                                popupWindow.updateChildrenAnimation();
                             }
+
                             recalculateDelays();
-                        }
 
-                        setupConnections();
-                        
-                        if (root.contentItem.hasOwnProperty("childrenChanged")) {
-                            root.contentItem.childrenChanged.connect(setupConnections);
-                        }
-                        
-                        let targetItem = root.contentItem;
-                        if (root.contentItem.children.length === 1) {
-                            let firstChild = root.contentItem.children[0];
-                            let name = firstChild.toString();
-                            if (name.includes("Layout") || firstChild.hasOwnProperty("spacing")) {
-                                targetItem = firstChild;
+                            // Listen to hierarchy changes to connect and recalculate delays properly
+                            function setupConnections() {
+                                if (!root || !root.contentItem)
+                                    return;
+                                let targetItem = root.contentItem;
+                                if (root.contentItem.children.length === 1) {
+                                    let firstChild = root.contentItem.children[0];
+                                    let name = firstChild.toString();
+                                    if (name.includes("Layout") || firstChild.hasOwnProperty("spacing")) {
+                                        targetItem = firstChild;
+                                    }
+                                }
+
+                                for (let i = 0; i < targetItem.children.length; i++) {
+                                    let child = targetItem.children[i];
+                                    if (child && child.hasOwnProperty("visibleChanged")) {
+                                        try {
+                                            child.visibleChanged.disconnect(recalculateDelays);
+                                        } catch (e) {}
+                                        child.visibleChanged.connect(recalculateDelays);
+                                    }
+                                }
+                                recalculateDelays();
                             }
-                        }
-                        if (targetItem !== root.contentItem && targetItem.hasOwnProperty("childrenChanged")) {
-                            targetItem.childrenChanged.connect(setupConnections);
+
+                            setupConnections();
+
+                            if (root.contentItem.hasOwnProperty("childrenChanged")) {
+                                root.contentItem.childrenChanged.connect(setupConnections);
+                            }
+
+                            let targetItem = root.contentItem;
+                            if (root.contentItem.children.length === 1) {
+                                let firstChild = root.contentItem.children[0];
+                                let name = firstChild.toString();
+                                if (name.includes("Layout") || firstChild.hasOwnProperty("spacing")) {
+                                    targetItem = firstChild;
+                                }
+                            }
+                            if (targetItem !== root.contentItem && targetItem.hasOwnProperty("childrenChanged")) {
+                                targetItem.childrenChanged.connect(setupConnections);
+                            }
                         }
                     }
-                }
                 }
 
                 HoverHandler {
@@ -461,7 +659,7 @@ LazyLoader {
                     }
                 }
 
-                border.width: 1
+                border.width: Config.options.appearance.transparency.popups ? 0 : 1
                 border.color: Appearance.colors.colLayer0Border
             }
         }

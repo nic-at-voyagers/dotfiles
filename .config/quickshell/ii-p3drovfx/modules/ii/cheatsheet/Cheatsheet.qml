@@ -33,6 +33,12 @@ Scope {
                 "name": Translation.tr("Elements")
             });
         }
+        if (Config.options.cheatsheet.enableAminoAcids) {
+            list.push({
+                "icon": "biotech",
+                "name": Translation.tr("Amino acids")
+            });
+        }
         if (Config.options.cheatsheet.enableCommands) {
             list.push({
                 "icon": "terminal",
@@ -54,6 +60,17 @@ Scope {
         return list;
     }
 
+    Connections {
+        target: GlobalStates
+        function onCheatsheetOpenChanged() {
+            if (GlobalStates.cheatsheetOpen) {
+                root.requestOpen();
+            } else {
+                root.requestClose();
+            }
+        }
+    }
+
     property bool activeState: false
 
     Timer {
@@ -68,12 +85,16 @@ Scope {
     function requestOpen() {
         closeTimer.stop();
         root.activeState = true;
-        GlobalStates.cheatsheetOpen = true;
+        if (!GlobalStates.cheatsheetOpen) {
+            GlobalStates.cheatsheetOpen = true;
+        }
     }
 
     function requestClose() {
-        GlobalStates.cheatsheetOpen = false;
-        closeTimer.start();
+        if (GlobalStates.cheatsheetOpen) {
+            GlobalStates.cheatsheetOpen = false;
+        }
+        closeTimer.restart();
     }
 
     function requestToggle() {
@@ -86,11 +107,14 @@ Scope {
 
     Loader {
         id: cheatsheetLoader
+        // The Cheatsheet is a burst-use surface. Keep it alive while open, but
+        // release its complete window tree after the close animation instead
+        // of retaining every tab for the lifetime of the shell.
         active: root.activeState
 
         sourceComponent: PanelWindow {
             id: cheatsheetRoot
-            visible: cheatsheetLoader.active
+            visible: root.activeState
 
             Connections {
                 target: root
@@ -135,7 +159,13 @@ Scope {
             onVisibleChanged: {
                 if (visible) {
                     initialFocusTimer.restart();
+                    registerGrabTimer.restart();
+                    animInTimer.restart();
+                    return;
                 }
+                registerGrabTimer.stop();
+                GlobalFocusGrab.removeDismissable(cheatsheetRoot);
+                cheatsheetBackground.animateIn = false;
             }
 
             Timer {
@@ -152,7 +182,12 @@ Scope {
             }
 
             Component.onCompleted: {
+                // Built ahead of time while hidden: onVisibleChanged drives the
+                // open from here on.
+                if (!visible)
+                    return;
                 registerGrabTimer.start();
+                animInTimer.start();
             }
             Component.onDestruction: {
                 registerGrabTimer.stop();
@@ -176,19 +211,19 @@ Scope {
                 id: dialogWrap
                 anchors.fill: parent
                 transformOrigin: Item.Center
-                scale: GlobalStates.cheatsheetOpen ? 1.0 : 0.95
-                opacity: GlobalStates.cheatsheetOpen ? 1.0 : 0.0
+                scale: cheatsheetBackground.animateIn && GlobalStates.cheatsheetOpen ? 1.0 : 0.94
+                opacity: cheatsheetBackground.animateIn && GlobalStates.cheatsheetOpen ? 1.0 : 0.0
                 
                 Behavior on scale {
                     NumberAnimation {
-                        duration: 180
+                        duration: 250
                         easing.type: Easing.BezierSpline
                         easing.bezierCurve: Appearance.animationCurves.emphasized
                     }
                 }
                 Behavior on opacity {
                     NumberAnimation {
-                        duration: 180
+                        duration: 220
                         easing.type: Easing.BezierSpline
                         easing.bezierCurve: Appearance.animationCurves.emphasized
                     }
@@ -200,17 +235,25 @@ Scope {
 
                 Rectangle {
                     id: cheatsheetBackground
-                anchors.centerIn: parent
-                color: Appearance.colors.colLayer0
-                border.width: 1
-                border.color: Appearance.colors.colLayer0Border
-                radius: Appearance.rounding.windowRounding
-                property real padding: 20
-                property int prevIndex: Persistent.states.cheatsheet.tabIndex
+                    anchors.centerIn: parent
+                    color: Appearance.colors.colLayer0
+                    border.width: 1
+                    border.color: Appearance.colors.colLayer0Border
+                    radius: Appearance.rounding.windowRounding
+                    property real padding: 20
+                    property int prevIndex: Persistent.states.cheatsheet.tabIndex
+                    property bool animateIn: false
 
-                property real maxBgWidth: cheatsheetRoot.screen ? cheatsheetRoot.screen.width * 0.95 : 1900
-                property real maxBgHeight: cheatsheetRoot.screen ? cheatsheetRoot.screen.height * 0.80 : 1000
-                
+                    Timer {
+                        id: animInTimer
+                        interval: 0
+                        repeat: false
+                        onTriggered: cheatsheetBackground.animateIn = true
+                    }
+
+                    property real maxBgWidth: cheatsheetRoot.screen ? cheatsheetRoot.screen.width * 0.95 : 1900
+                    property real maxBgHeight: cheatsheetRoot.screen ? cheatsheetRoot.screen.height * 0.80 : 1000
+
                 implicitWidth: Math.min(maxBgWidth, cheatsheetColumnLayout.implicitWidth + padding * 2)
                 implicitHeight: Math.min(maxBgHeight, cheatsheetColumnLayout.implicitHeight + padding * 2)
 
@@ -252,6 +295,15 @@ Scope {
                         rightMargin: 20
                     }
 
+                    scale: cheatsheetBackground.animateIn ? 1.0 : 0.0
+                    Behavior on scale {
+                        NumberAnimation {
+                            duration: 300
+                            easing.type: Easing.OutBack
+                            easing.overshoot: 1.5
+                        }
+                    }
+
                     onClicked: {
                         cheatsheetRoot.hide();
                     }
@@ -261,6 +313,14 @@ Scope {
                         horizontalAlignment: Text.AlignHCenter
                         font.pixelSize: Appearance.font.pixelSize.title
                         text: "close"
+                        rotation: closeButton.isHovered ? 90 : 0
+                        Behavior on rotation {
+                            NumberAnimation {
+                                duration: 200
+                                easing.type: Easing.OutBack
+                                easing.overshoot: 1.5
+                            }
+                        }
                     }
                 }
 
@@ -272,8 +332,30 @@ Scope {
                     spacing: 10
 
                     Toolbar {
+                        id: topToolbar
                         Layout.alignment: Qt.AlignHCenter
                         enableShadow: false
+
+                        transform: Translate {
+                            id: toolbarTrans
+                            y: cheatsheetBackground.animateIn ? 0 : -20
+                        }
+                        opacity: cheatsheetBackground.animateIn ? 1.0 : 0.0
+
+                        Behavior on opacity {
+                            NumberAnimation {
+                                duration: 280
+                                easing.type: Easing.OutCubic
+                            }
+                        }
+                        Behavior on transform {
+                            NumberAnimation {
+                                duration: 320
+                                easing.type: Easing.OutBack
+                                easing.overshoot: 1.3
+                            }
+                        }
+
                         ToolbarTabBar {
                             id: tabBar
                             tabButtonList: root.tabButtonList
@@ -376,12 +458,10 @@ Scope {
                                     easing.type: Easing.OutCubic
                                 }
 
-                                // Timetable, Email & Workspaces: lazy — load only when first visited
-                                property bool _lazy: modelData.icon === "calendar_month" || modelData.icon === "mail" || modelData.icon === "dashboard"
-                                property bool _wasSeen: false
-                                active: !_lazy || swipeView.currentIndex === index || _wasSeen
-                                onActiveChanged: if (active)
-                                    _wasSeen = true
+                                // Only the visible tab owns a component tree. The
+                                // old _wasSeen/preloadIndex feedback loop kept all
+                                // tabs resident and made Loader.active unstable.
+                                active: swipeView.currentIndex === index
 
                                 onStatusChanged: {
                                     if (status === Loader.Ready && swipeView.currentIndex === index && cheatsheetRoot.visible) {
@@ -389,7 +469,9 @@ Scope {
                                     }
                                 }
 
-                                asynchronous: _lazy
+                                // Synchronous on purpose: async incubation paces object
+                                // creation across frames, which on a downclocked CPU
+                                // costs far more waiting than the build itself.
                                 source: {
                                     switch (modelData.icon) {
                                     case "calendar_month":
@@ -398,6 +480,8 @@ Scope {
                                         return "CheatsheetKeybinds.qml";
                                     case "experiment":
                                         return "CheatsheetPeriodicTable.qml";
+                                    case "biotech":
+                                        return "CheatsheetAminoAcids.qml";
                                     case "terminal":
                                         return "commands/CheatsheetCommands.qml";
                                     case "dashboard":
@@ -408,35 +492,12 @@ Scope {
                                         return "";
                                     }
                                 }
-
-                                // Loading indicator for async tabs
-                                Rectangle {
-                                    anchors.fill: parent
-                                    color: "transparent"
-                                    visible: tabDelegate._lazy && tabDelegate.status !== Loader.Ready
-                                    MaterialLoadingIndicator {
-                                        anchors.centerIn: parent
-                                    }
-                                }
                             }
                         }
                     }
                 }
             }
             }
-        }
-    }
-
-    IpcHandler {
-        target: "cheatsheet"
-        function toggle(): void {
-            root.requestToggle();
-        }
-        function close(): void {
-            root.requestClose();
-        }
-        function open(): void {
-            root.requestOpen();
         }
     }
 

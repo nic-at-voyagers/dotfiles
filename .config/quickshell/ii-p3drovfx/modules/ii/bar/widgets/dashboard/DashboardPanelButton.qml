@@ -1,6 +1,7 @@
 import QtQuick
 import "."
 import QtQuick.Layouts
+import Quickshell
 import qs
 import qs.services
 import qs.modules.common
@@ -9,9 +10,9 @@ import qs.modules.common.widgets
 RippleButton { // Right sidebar button
     id: rightSidebarButton
 
+    readonly property string screenName: QsWindow.window?.screen?.name ?? ""
+
     Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
-    Layout.fillWidth: true
-    Layout.fillHeight: true
 
     property real startRadius: Appearance.rounding.full
     property real endRadius: Appearance.rounding.full
@@ -21,8 +22,8 @@ RippleButton { // Right sidebar button
     topRightRadius: endRadius
     bottomRightRadius: endRadius
 
-    implicitWidth: indicatorsRowLayout.implicitWidth + 12 * 2
-    implicitHeight: Appearance.sizes.baseBarHeight
+    implicitWidth: indicatorsRowLayout.implicitWidth + 10
+    implicitHeight: Math.max(indicatorsRowLayout.implicitHeight, Appearance.font.pixelSize.larger) + 10
 
     colBackgroundHover: Appearance.colors.colLayer1Hover
     colRipple: Appearance.colors.colLayer1Active
@@ -37,7 +38,7 @@ RippleButton { // Right sidebar button
     }
 
     onPressed: {
-        GlobalStates.sidebarRightOpen = !GlobalStates.sidebarRightOpen;
+        GlobalStates.toggleRightSidebar(screenName);
     }
 
     RowLayout {
@@ -97,7 +98,7 @@ RippleButton { // Right sidebar button
             }
             Loader {
                 id: notificationUnreadCount
-                sourceComponent: Config.options.bar.styles.notification === "expressive" ? expressiveNotificationComp : defaultNotificationComp
+                sourceComponent: (Config.options.bar.styles.dashboard === "expressive") ? expressiveNotificationComp : defaultNotificationComp
             }
             Component {
                 id: defaultNotificationComp
@@ -108,15 +109,52 @@ RippleButton { // Right sidebar button
                 ExpressiveNotificationUnreadCount {}
             }
         }
-        MaterialSymbol {
-            text: Network.materialSymbol
-            iconSize: Appearance.font.pixelSize.larger
-            color: rightSidebarButton.colText
+        Item {
+            Layout.fillHeight: true
+            implicitWidth: netFgIcon.implicitWidth
+            implicitHeight: netFgIcon.implicitHeight
+
+            readonly property string fullWifiIcon: {
+                var sym = Network.materialSymbol;
+                if (sym.startsWith("android_wifi") || sym.startsWith("wifi") || sym.startsWith("signal_wifi")) return "wifi";
+                return "";
+            }
+
+            MaterialSymbol {
+                visible: parent.fullWifiIcon !== ""
+                anchors.centerIn: parent
+                text: parent.fullWifiIcon
+                iconSize: Appearance.font.pixelSize.larger
+                opacity: 0.3
+                color: rightSidebarButton.colText
+            }
+
+            MaterialSymbol {
+                id: netFgIcon
+                anchors.centerIn: parent
+                text: Network.materialSymbol
+                iconSize: Appearance.font.pixelSize.larger
+                color: rightSidebarButton.colText
+            }
         }
         MaterialSymbol {
             Layout.leftMargin: indicatorsRowLayout.realSpacing
             visible: BluetoothStatus.available
             text: BluetoothStatus.connected ? "bluetooth_connected" : BluetoothStatus.enabled ? "bluetooth" : "bluetooth_disabled"
+            iconSize: Appearance.font.pixelSize.larger
+            color: rightSidebarButton.colText
+        }
+        MaterialSymbol {
+            Layout.leftMargin: indicatorsRowLayout.realSpacing
+            visible: Config.options.bar.dashboardButton.showVpn && VpnService.active
+            text: "key"
+            iconSize: Appearance.font.pixelSize.larger
+            color: rightSidebarButton.colText
+        }
+        MaterialSymbol {
+            Layout.leftMargin: indicatorsRowLayout.realSpacing
+            visible: Config.options.bar.dashboardButton.showTailscale && TailscaleService.active
+            text: "hub"
             iconSize: Appearance.font.pixelSize.larger
             color: rightSidebarButton.colText
         }

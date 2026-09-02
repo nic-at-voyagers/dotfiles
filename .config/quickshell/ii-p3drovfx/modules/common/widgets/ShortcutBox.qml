@@ -10,6 +10,8 @@ Rectangle {
     id: root
     property string text: ""
     property string value: ""
+    property string targetPageId: ""
+    // Deprecated — use targetPageId
     property int targetPageIndex: -1
     property string targetSectionTitle: ""
     property string linkText: Translation.tr("Go there")
@@ -43,7 +45,7 @@ Rectangle {
 
     property bool isFirst: itemIndex === 0
     property bool isLast: itemIndex === totalItems - 1
-    readonly property bool isPressed: false
+    readonly property bool isPressed: mouseArea.pressed
 
     readonly property bool prevIsPressed: {
         var p = parent;
@@ -116,9 +118,13 @@ Rectangle {
 
     function navigateToTarget() {
         var win = root.QsWindow.window;
-        if (win && win.currentPage !== undefined && root.targetPageIndex >= 0) {
+        if (!win || win.currentPage === undefined)
+            return;
+        // Prefer the stable page id; targetPageIndex is deprecated
+        var idx = (root.targetPageId !== "" && win.pageIndexById !== undefined) ? win.pageIndexById(root.targetPageId) : root.targetPageIndex;
+        if (idx >= 0) {
             win.pendingSectionHighlight = root.targetSectionTitle;
-            win.currentPage = root.targetPageIndex;
+            win.currentPage = idx;
         }
     }
 

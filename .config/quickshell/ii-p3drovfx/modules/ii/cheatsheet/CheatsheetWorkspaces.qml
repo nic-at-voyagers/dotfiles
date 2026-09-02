@@ -6,6 +6,7 @@ import QtQuick.Window
 import QtQuick.Controls
 import Quickshell
 import qs.modules.common
+import qs.modules.common.functions
 import qs.modules.common.widgets
 import qs.services
 import "workspaces"
@@ -394,7 +395,9 @@ Item {
                             StyledText {
                                 id: commandText
                                 Layout.fillWidth: true
-                                text: "cd ~/.config/quickshell/ii/scripts/hyprland/workspace_profile_manager_src && cargo build --release && cp target/release/workspace_profile_manager ../"
+                                // Derived rather than written out: the config directory
+                                // is named by $qsConfig and is not always `ii`.
+                                text: `cd ${Directories.scriptPath.replace(FileUtils.trimFileProtocol(Directories.home), "~")}/hyprland/workspace_profile_manager_src && cargo build --release && cp target/release/workspace_profile_manager ../`
                                 font {
                                     family: Appearance.font.family.monospace
                                     pixelSize: Appearance.font.pixelSize.smaller
@@ -460,6 +463,26 @@ Item {
                 horizontalCenter: parent.horizontalCenter
                 bottom: parent.bottom
                 bottomMargin: 8
+            }
+
+            transform: Translate {
+                id: searchBarTrans
+                y: root.isTabActive ? 0 : 35
+            }
+            opacity: root.isTabActive ? 1.0 : 0.0
+
+            Behavior on opacity {
+                NumberAnimation {
+                    duration: 250
+                    easing.type: Easing.OutCubic
+                }
+            }
+            Behavior on transform {
+                NumberAnimation {
+                    duration: 350
+                    easing.type: Easing.OutBack
+                    easing.overshoot: 1.3
+                }
             }
 
             ToolbarTextField {

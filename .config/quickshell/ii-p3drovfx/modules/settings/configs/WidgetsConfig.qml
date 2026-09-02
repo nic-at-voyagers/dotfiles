@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Layouts
 import Quickshell
+import Quickshell.Io
 import qs.services
 import qs.modules.common
 import qs.modules.common.widgets
@@ -10,23 +11,82 @@ Item {
     id: widgetsConfigRoot
 
     property alias contentY: page.contentY
-    property url activeSubPage: ""
+    property alias activeSubPage: subPageOverlay.activeSubPage
+    // When non-empty, opens the extension config schema sub-page for this extId
+    property string extensionConfigExtId: ""
 
-    property var clockWidgets: (WidgetsRegistry.allWidgets || []).filter(function(w) { return w.category === "Clock"; })
-    property var mediaWidgets: (WidgetsRegistry.allWidgets || []).filter(function(w) { return w.category === "Media"; })
-    property var weatherWidgets: (WidgetsRegistry.allWidgets || []).filter(function(w) { return w.category === "Weather"; })
-    property var dateWidgets: (WidgetsRegistry.allWidgets || []).filter(function(w) { return w.category === "Date"; })
-    property var photoWidgets: (WidgetsRegistry.allWidgets || []).filter(function(w) { return w.category === "Photo"; })
+    // Build all category models in one pass. Each individual filter used to
+    // walk the complete registry again whenever an extension changed.
+    readonly property var widgetCategories: {
+        const categories = {
+            Clock: [],
+            Media: [],
+            Weather: [],
+            Date: [],
+            Photo: [],
+            Bluetooth: [],
+            Utility: [],
+            Resources: [],
+            System: []
+        };
+        const allWidgets = WidgetsRegistry.allWidgets || [];
+        for (let i = 0; i < allWidgets.length; i++) {
+            const widget = allWidgets[i];
+            if (widget.category === "Devices" || widget.category === "Bluetooth")
+                categories.Bluetooth.push(widget);
+            else if (categories[widget.category] !== undefined)
+                categories[widget.category].push(widget);
+        }
+        return categories;
+    }
+
+    readonly property var clockWidgets: widgetCategories.Clock
+    readonly property var mediaWidgets: widgetCategories.Media
+    readonly property var weatherWidgets: widgetCategories.Weather
+    readonly property var dateWidgets: widgetCategories.Date
+    readonly property var photoWidgets: widgetCategories.Photo
+    readonly property var bluetoothWidgets: widgetCategories.Bluetooth
+    readonly property var utilityWidgets: widgetCategories.Utility
+    readonly property var resourceWidgets: widgetCategories.Resources
+    readonly property var systemWidgets: widgetCategories.System
+
+    // Accordion collapse state per category. Default: all categories collapsed.
+    // When collapsed, widget preview Loaders are not active → no GPU/memory cost.
+    property bool clockExpanded: false
+    property bool mediaExpanded: false
+    property bool weatherExpanded: false
+    property bool dateExpanded: false
+    property bool photoExpanded: false
+    property bool bluetoothExpanded: false
+    property bool utilityExpanded: false
+    property bool resourceExpanded: false
+    property bool systemExpanded: false
+
+    // Rich catalog sections are opt-in. This keeps the first page pass limited
+    // to the small Desktop Widgets controls and avoids starting network work.
+    property bool colorSchemeActive: false
+    property bool extensionsExpanded: false
+    property bool communityExpanded: false
 
     property var _previewQueue: []
     property bool _previewStaggerActive: false
 
     function _enqueuePreview(card) {
+        if (!card || card._previewActive || card._previewQueued || !card.previewNearViewport)
+            return;
+
+        card._previewQueued = true;
         _previewQueue.push(card);
         if (!_previewStaggerActive) {
             _previewStaggerActive = true;
             _previewStaggerTimer.start();
         }
+    }
+
+    function _removePreview(card) {
+        const index = _previewQueue.indexOf(card);
+        if (index >= 0)
+            _previewQueue.splice(index, 1);
     }
 
     Timer {
@@ -36,7 +96,11 @@ Item {
         onTriggered: {
             if (widgetsConfigRoot._previewQueue.length > 0) {
                 var card = widgetsConfigRoot._previewQueue.shift();
-                if (card) card._previewActive = true;
+                if (card) {
+                    card._previewQueued = false;
+                    if (card.previewNearViewport)
+                        card._previewActive = true;
+                }
             } else {
                 widgetsConfigRoot._previewStaggerActive = false;
                 stop();
@@ -44,11 +108,20 @@ Item {
         }
     }
 
+    Timer {
+        id: colorSchemeLoadTimer
+        interval: 0
+        repeat: false
+        onTriggered: widgetsConfigRoot.colorSchemeActive = true
+    }
+
+    Component.onCompleted: colorSchemeLoadTimer.start()
+
     ContentPage {
         id: page
         anchors.fill: parent
         forceWidth: false
-        opacity: subPageOverlay.width > 0 ? (subPageOverlay.x / subPageOverlay.width) : 1
+        opacity: subPageOverlay.slideProgress
         visible: opacity > 0
 
         ContentSection {
@@ -58,7 +131,7 @@ Item {
             ShortcutBox {
                 Layout.fillWidth: true
                 value: Translation.tr("Lock screen widget settings")
-                targetPageIndex: 18
+                targetPageId: "lockScreen"
                 targetSectionTitle: Translation.tr("Lockscreen widget")
                 materialIcon: "lock"
             }
@@ -108,19 +181,97 @@ Item {
                         Config.options.background.widgets.lockWidgetPositions = checked;
                     }
                 }
+
+                ConfigSwitch {
+                    Layout.fillWidth: true
+                    buttonIcon: "desktop_windows"
+                    text: Translation.tr("Show widgets only in one monitor")
+                    checked: Config.options.background.widgets.showOnlyOnSingleMonitor ?? false
+                    onCheckedChanged: {
+                        Config.options.background.widgets.showOnlyOnSingleMonitor = checked;
+                    }
+                }
+
+                MonitorPicker {
+                    Layout.fillWidth: true
+                    visible: Config.options.background.widgets.showOnlyOnSingleMonitor ?? false
+                    currentValue: Config.options.background.widgets.targetMonitor ?? ""
+                    onSelected: newValue => {
+                        Config.options.background.widgets.targetMonitor = newValue;
+                    }
+                }
+
+                Loader {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: item ? item.implicitHeight : 0
+                    active: widgetsConfigRoot.colorSchemeActive
+                    asynchronous: true
+                    sourceComponent: ContentSubsection {
+                        title: Translation.tr("Widget Color Scheme")
+                        icon: "palette"
+                        Layout.fillWidth: true
+
+                        Rectangle {
+                            Layout.fillWidth: true
+                            implicitHeight: schemeGrid.implicitHeight + 24
+                            color: Appearance.colors.colLayer1
+                            radius: Appearance.rounding.normal
+                            border.color: Appearance.colors.colLayer0Border
+                            border.width: 1
+
+                            GridLayout {
+                                id: schemeGrid
+                                anchors.fill: parent
+                                anchors.margins: 12
+                                columns: 3
+                                rowSpacing: 8
+                                columnSpacing: 8
+
+                                Repeater {
+                                    model: WidgetColorScheme.availableSchemes
+
+                                    delegate: ColorPreviewButton {
+                                        required property var modelData
+
+                                        Layout.fillWidth: true
+                                        isWidgetScheme: true
+                                        colorScheme: modelData
+                                        colorSchemeDisplayName: WidgetColorScheme.schemes[modelData] ? WidgetColorScheme.schemes[modelData].name : modelData
+                                        widgetSchemeToggled: WidgetColorScheme.currentScheme === modelData
+                                        usePreviewColors: true
+                                        previewPrimary: WidgetColorScheme.getCardBgColor(modelData)
+                                        previewSecondary: WidgetColorScheme.getTextColorOnBg(modelData)
+                                        previewTertiary: WidgetColorScheme.getAccentColor(modelData)
+
+                                        onClicked: Config.options.background.widgets.colorScheme = modelData
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
 
             ContentSubsection {
                 title: Translation.tr("Clocks")
                 icon: "schedule"
                 Layout.fillWidth: true
+                collapsible: true
+                expanded: widgetsConfigRoot.clockExpanded
+                onExpandedChanged: widgetsConfigRoot.clockExpanded = expanded
 
-                Flow {
+                // GPU: Loader prevents Flow+Repeater+cards from being created when collapsed
+                Loader {
                     Layout.fillWidth: true
-                    spacing: 12
-                    Repeater {
-                        model: widgetsConfigRoot.clockWidgets
-                        delegate: widgetCardComponent
+                    active: widgetsConfigRoot.clockExpanded
+                    asynchronous: true
+                    sourceComponent: Flow {
+                        Layout.fillWidth: true
+                        spacing: 12
+                        Repeater {
+                            model: widgetsConfigRoot.clockWidgets
+                            delegate: widgetCardComponent
+                        }
                     }
                 }
             }
@@ -129,13 +280,21 @@ Item {
                 title: Translation.tr("Media Players")
                 icon: "play_circle"
                 Layout.fillWidth: true
+                collapsible: true
+                expanded: widgetsConfigRoot.mediaExpanded
+                onExpandedChanged: widgetsConfigRoot.mediaExpanded = expanded
 
-                Flow {
+                Loader {
                     Layout.fillWidth: true
-                    spacing: 12
-                    Repeater {
-                        model: widgetsConfigRoot.mediaWidgets
-                        delegate: widgetCardComponent
+                    active: widgetsConfigRoot.mediaExpanded
+                    asynchronous: true
+                    sourceComponent: Flow {
+                        Layout.fillWidth: true
+                        spacing: 12
+                        Repeater {
+                            model: widgetsConfigRoot.mediaWidgets
+                            delegate: widgetCardComponent
+                        }
                     }
                 }
             }
@@ -144,13 +303,21 @@ Item {
                 title: Translation.tr("Weather")
                 icon: "cloud"
                 Layout.fillWidth: true
+                collapsible: true
+                expanded: widgetsConfigRoot.weatherExpanded
+                onExpandedChanged: widgetsConfigRoot.weatherExpanded = expanded
 
-                Flow {
+                Loader {
                     Layout.fillWidth: true
-                    spacing: 12
-                    Repeater {
-                        model: widgetsConfigRoot.weatherWidgets
-                        delegate: widgetCardComponent
+                    active: widgetsConfigRoot.weatherExpanded
+                    asynchronous: true
+                    sourceComponent: Flow {
+                        Layout.fillWidth: true
+                        spacing: 12
+                        Repeater {
+                            model: widgetsConfigRoot.weatherWidgets
+                            delegate: widgetCardComponent
+                        }
                     }
                 }
             }
@@ -159,13 +326,21 @@ Item {
                 title: Translation.tr("Date & Calendar")
                 icon: "calendar_today"
                 Layout.fillWidth: true
+                collapsible: true
+                expanded: widgetsConfigRoot.dateExpanded
+                onExpandedChanged: widgetsConfigRoot.dateExpanded = expanded
 
-                Flow {
+                Loader {
                     Layout.fillWidth: true
-                    spacing: 12
-                    Repeater {
-                        model: widgetsConfigRoot.dateWidgets
-                        delegate: widgetCardComponent
+                    active: widgetsConfigRoot.dateExpanded
+                    asynchronous: true
+                    sourceComponent: Flow {
+                        Layout.fillWidth: true
+                        spacing: 12
+                        Repeater {
+                            model: widgetsConfigRoot.dateWidgets
+                            delegate: widgetCardComponent
+                        }
                     }
                 }
             }
@@ -174,19 +349,159 @@ Item {
                 title: Translation.tr("Photo")
                 icon: "image"
                 Layout.fillWidth: true
+                collapsible: true
+                expanded: widgetsConfigRoot.photoExpanded
+                onExpandedChanged: widgetsConfigRoot.photoExpanded = expanded
 
-                Flow {
+                Loader {
                     Layout.fillWidth: true
-                    spacing: 12
-                    Repeater {
-                        model: widgetsConfigRoot.photoWidgets
-                        delegate: widgetCardComponent
+                    active: widgetsConfigRoot.photoExpanded
+                    asynchronous: true
+                    sourceComponent: Flow {
+                        Layout.fillWidth: true
+                        spacing: 12
+                        Repeater {
+                            model: widgetsConfigRoot.photoWidgets
+                            delegate: widgetCardComponent
+                        }
+                    }
+                }
+            }
+
+            ContentSubsection {
+                title: Translation.tr("Devices & Bluetooth")
+                icon: "earbuds"
+                Layout.fillWidth: true
+                collapsible: true
+                expanded: widgetsConfigRoot.bluetoothExpanded
+                onExpandedChanged: widgetsConfigRoot.bluetoothExpanded = expanded
+
+                Loader {
+                    Layout.fillWidth: true
+                    active: widgetsConfigRoot.bluetoothExpanded
+                    asynchronous: true
+                    sourceComponent: Flow {
+                        Layout.fillWidth: true
+                        spacing: 12
+                        Repeater {
+                            model: widgetsConfigRoot.bluetoothWidgets
+                            delegate: widgetCardComponent
+                        }
+                    }
+                }
+            }
+
+            ContentSubsection {
+                title: Translation.tr("Utility")
+                icon: "build"
+                Layout.fillWidth: true
+                collapsible: true
+                expanded: widgetsConfigRoot.utilityExpanded
+                onExpandedChanged: widgetsConfigRoot.utilityExpanded = expanded
+
+                Loader {
+                    Layout.fillWidth: true
+                    active: widgetsConfigRoot.utilityExpanded
+                    asynchronous: true
+                    sourceComponent: Flow {
+                        Layout.fillWidth: true
+                        spacing: 12
+                        Repeater {
+                            model: widgetsConfigRoot.utilityWidgets
+                            delegate: widgetCardComponent
+                        }
+                    }
+                }
+            }
+
+            ContentSubsection {
+                title: Translation.tr("System")
+                icon: "tune"
+                Layout.fillWidth: true
+                collapsible: true
+                expanded: widgetsConfigRoot.systemExpanded
+                onExpandedChanged: widgetsConfigRoot.systemExpanded = expanded
+
+                Loader {
+                    Layout.fillWidth: true
+                    active: widgetsConfigRoot.systemExpanded
+                    asynchronous: true
+                    sourceComponent: Flow {
+                        Layout.fillWidth: true
+                        spacing: 12
+                        Repeater {
+                            model: widgetsConfigRoot.systemWidgets
+                            delegate: widgetCardComponent
+                        }
+                    }
+                }
+            }
+
+            ContentSubsection {
+                title: Translation.tr("Resources")
+                icon: "monitor_heart"
+                Layout.fillWidth: true
+                collapsible: true
+                expanded: widgetsConfigRoot.resourceExpanded
+                onExpandedChanged: widgetsConfigRoot.resourceExpanded = expanded
+
+                Loader {
+                    Layout.fillWidth: true
+                    active: widgetsConfigRoot.resourceExpanded
+                    asynchronous: true
+                    sourceComponent: Flow {
+                        Layout.fillWidth: true
+                        spacing: 12
+                        Repeater {
+                            model: widgetsConfigRoot.resourceWidgets
+                            delegate: widgetCardComponent
+                        }
                     }
                 }
             }
         }
-    }
 
+        // ── Widget Extensions ────────────────────────────────────────────────
+        ContentSection {
+            title: Translation.tr("Widget Extensions")
+            icon: "extension"
+            collapsible: true
+            expanded: widgetsConfigRoot.extensionsExpanded
+            onExpandedChanged: widgetsConfigRoot.extensionsExpanded = expanded
+
+            Loader {
+                id: extensionsContentLoader
+                Layout.fillWidth: true
+                Layout.preferredHeight: item ? item.implicitHeight : 0
+                active: widgetsConfigRoot.extensionsExpanded
+                asynchronous: true
+                source: Qt.resolvedUrl("widgets/WidgetExtensionsContent.qml")
+            }
+
+            Connections {
+                target: extensionsContentLoader.item
+                function onExtensionConfigRequested(extId) {
+                    widgetsConfigRoot.extensionConfigExtId = extId;
+                }
+            }
+        }
+
+        ContentSection {
+            title: Translation.tr("Browse Community Widgets")
+            icon: "travel_explore"
+            collapsible: true
+            expanded: widgetsConfigRoot.communityExpanded
+            onExpandedChanged: widgetsConfigRoot.communityExpanded = expanded
+
+            Loader {
+                Layout.fillWidth: true
+                Layout.preferredHeight: item ? item.implicitHeight : 0
+                active: widgetsConfigRoot.communityExpanded
+                asynchronous: true
+                source: Qt.resolvedUrl("widgets/WidgetCommunityContent.qml")
+            }
+        }
+    }
     Component {
         id: widgetCardComponent
 
@@ -196,23 +511,53 @@ Item {
             implicitHeight: mainColumn.implicitHeight + 12
 
             property bool _previewActive: false
+            property bool _previewQueued: false
             property bool hovered: cardMouseArea.containsMouse
 
-            Component.onCompleted: widgetsConfigRoot._enqueuePreview(cardItem)
+            readonly property bool previewNearViewport: {
+                // These explicit dependencies make the binding react to
+                // scrolling and Flow relayouts; mapToItem itself is not a
+                // reactive dependency in QML.
+                widgetsConfigRoot.contentY;
+                widgetsConfigRoot.width;
+                widgetsConfigRoot.height;
+                cardItem.x;
+                cardItem.y;
+                cardItem.height;
+
+                if (!cardItem.visible || widgetsConfigRoot.height <= 0)
+                    return false;
+
+                const point = cardItem.mapToItem(widgetsConfigRoot, 0, 0);
+                const lookahead = Math.max(cardItem.height, widgetsConfigRoot.height * 0.25);
+                return point.y < widgetsConfigRoot.height + lookahead
+                    && point.y + cardItem.height > -lookahead;
+            }
+
+            function requestPreviewIfVisible() {
+                if (previewNearViewport)
+                    widgetsConfigRoot._enqueuePreview(cardItem);
+            }
+
+            Component.onCompleted: Qt.callLater(requestPreviewIfVisible)
+            Component.onDestruction: widgetsConfigRoot._removePreview(cardItem)
+            onPreviewNearViewportChanged: requestPreviewIfVisible()
 
             readonly property var widgetData: modelData
             readonly property var _activeWidgets: Config.options.background.activeWidgets
             readonly property bool isActive: {
                 let list = _activeWidgets || [];
                 for (let i = 0; i < list.length; i++) {
-                    if (list[i].widgetId === widgetData.widgetId) return true;
+                    if (list[i].widgetId === widgetData.widgetId)
+                        return true;
                 }
                 return false;
             }
             readonly property string currentLockBehavior: {
                 let list = _activeWidgets || [];
                 for (let i = 0; i < list.length; i++) {
-                    if (list[i].widgetId === widgetData.widgetId) return list[i].lockBehavior || "hide";
+                    if (list[i].widgetId === widgetData.widgetId)
+                        return list[i].lockBehavior || "hide";
                 }
                 return "hide";
             }
@@ -231,7 +576,9 @@ Item {
                 radius: Appearance.rounding.large
 
                 Behavior on color {
-                    ColorAnimation { duration: 150 }
+                    ColorAnimation {
+                        duration: 150
+                    }
                 }
 
                 Canvas {
@@ -263,7 +610,9 @@ Item {
                     Component.onCompleted: requestPaint()
                     Connections {
                         target: cardItem
-                        function onIsActiveChanged() { dashedBorderCanvas.requestPaint(); }
+                        function onIsActiveChanged() {
+                            dashedBorderCanvas.requestPaint();
+                        }
                     }
                 }
             }
@@ -302,6 +651,7 @@ Item {
                             id: widgetPreviewLoader
                             anchors.fill: parent
                             active: cardItem._previewActive
+                            asynchronous: true
                             source: cardItem._previewActive ? cardItem.widgetData.qmlPath : ""
 
                             Binding {
@@ -354,7 +704,9 @@ Item {
                     visible: !cardItem.isActive
 
                     Behavior on color {
-                        ColorAnimation { duration: 100 }
+                        ColorAnimation {
+                            duration: 100
+                        }
                     }
 
                     Row {
@@ -397,7 +749,9 @@ Item {
                     visible: cardItem.isActive
 
                     Behavior on color {
-                        ColorAnimation { duration: 100 }
+                        ColorAnimation {
+                            duration: 100
+                        }
                     }
 
                     Row {
@@ -453,7 +807,9 @@ Item {
                         color: settingsBtnMouse.containsMouse ? Appearance.colors.colSecondaryContainerHover : Appearance.colors.colSecondaryContainer
 
                         Behavior on color {
-                            ColorAnimation { duration: 100 }
+                            ColorAnimation {
+                                duration: 100
+                            }
                         }
 
                         MaterialSymbol {
@@ -485,31 +841,45 @@ Item {
 
                     Repeater {
                         model: [
-                            { value: "hide", icon: "visibility_off", tooltip: "Hidden on lock" },
-                            { value: "keep", icon: "visibility", tooltip: "Show fixed on lock" },
-                            { value: "center", icon: "center_focus_strong", tooltip: "Center on lock" },
-                            { value: "lockOnly", icon: "lock", tooltip: "Lock only" }
+                            {
+                                value: "hide",
+                                icon: "visibility_off",
+                                tooltip: "Hidden on lock"
+                            },
+                            {
+                                value: "keep",
+                                icon: "visibility",
+                                tooltip: "Show fixed on lock"
+                            },
+                            {
+                                value: "center",
+                                icon: "center_focus_strong",
+                                tooltip: "Center on lock"
+                            },
+                            {
+                                value: "lockOnly",
+                                icon: "lock",
+                                tooltip: "Lock only"
+                            }
                         ]
 
                         delegate: Rectangle {
                             width: 26
                             height: 26
                             radius: Appearance.rounding.small
-                            color: lockBehaviorRow.currentBehavior === modelData.value
-                                ? Appearance.colors.colPrimary
-                                : Appearance.colors.colSurfaceContainerLow
+                            color: lockBehaviorRow.currentBehavior === modelData.value ? Appearance.colors.colPrimary : Appearance.colors.colSurfaceContainerLow
 
                             Behavior on color {
-                                ColorAnimation { duration: 150 }
+                                ColorAnimation {
+                                    duration: 150
+                                }
                             }
 
                             MaterialSymbol {
                                 anchors.centerIn: parent
                                 text: modelData.icon
                                 iconSize: 13
-                                color: lockBehaviorRow.currentBehavior === modelData.value
-                                    ? Appearance.colors.colOnPrimary
-                                    : Appearance.colors.colOnSurfaceVariant
+                                color: lockBehaviorRow.currentBehavior === modelData.value ? Appearance.colors.colOnPrimary : Appearance.colors.colOnSurfaceVariant
                             }
 
                             MouseArea {
@@ -533,25 +903,27 @@ Item {
         }
     }
 
+    // Extension config schema sub-page overlay
     Item {
-        id: subPageOverlay
+        id: extConfigOverlay
         width: parent.width
         height: parent.height
         y: 0
-        z: 10
+        z: 11
 
-        property bool isOpen: widgetsConfigRoot.activeSubPage.toString() !== ""
+        property bool isOpen: widgetsConfigRoot.extensionConfigExtId !== ""
         property bool overlayActive: isOpen
 
         onXChanged: {
-            if (!isOpen && x >= subPageOverlay.width - 1)
+            if (!isOpen && x >= extConfigOverlay.width - 1)
                 overlayActive = false;
         }
         onIsOpenChanged: {
-            if (isOpen) overlayActive = true;
+            if (isOpen)
+                overlayActive = true;
         }
 
-        x: isOpen ? 0 : subPageOverlay.width
+        x: isOpen ? 0 : extConfigOverlay.width
 
         Behavior on x {
             NumberAnimation {
@@ -563,17 +935,117 @@ Item {
 
         enabled: isOpen
 
-        Loader {
-            id: subPageLoader
+        // Inline config schema renderer
+        Rectangle {
             anchors.fill: parent
-            source: widgetsConfigRoot.activeSubPage
-            active: subPageOverlay.overlayActive
+            color: Appearance.colors.colLayer0
+            visible: extConfigOverlay.overlayActive
 
-            onLoaded: {
-                item.goBack.connect(function() {
-                    widgetsConfigRoot.activeSubPage = "";
-                });
+            ColumnLayout {
+                anchors {
+                    top: parent.top
+                    left: parent.left
+                    right: parent.right
+                    margins: 16
+                }
+                spacing: 0
+
+                // Header row
+                RowLayout {
+                    Layout.fillWidth: true
+                    Layout.topMargin: 8
+                    spacing: 12
+
+                    RippleButton {
+                        implicitWidth: implicitHeight
+                        implicitHeight: 40
+                        topLeftRadius: Appearance.rounding.full
+                        topRightRadius: Appearance.rounding.full
+                        bottomLeftRadius: Appearance.rounding.full
+                        bottomRightRadius: Appearance.rounding.full
+                        colBackground: Appearance.colors.colSecondaryContainer
+                        colBackgroundHover: Appearance.colors.colSecondaryContainerHover
+                        colRipple: Appearance.colors.colSecondaryContainerActive
+                        onClicked: widgetsConfigRoot.extensionConfigExtId = ""
+
+                        MaterialSymbol {
+                            anchors.centerIn: parent
+                            text: "arrow_back"
+                            iconSize: Appearance.font.pixelSize.large
+                            color: Appearance.colors.colOnSecondaryContainer
+                        }
+                    }
+
+                    StyledText {
+                        text: {
+                            let extId = widgetsConfigRoot.extensionConfigExtId;
+                            if (!extId)
+                                return "";
+                            let entry = WidgetExtensionManager.installedWidgets[extId];
+                            return entry ? (entry.name + " — " + Translation.tr("Settings")) : Translation.tr("Settings");
+                        }
+                        font.pixelSize: Appearance.font.pixelSize.large
+                        font.family: Appearance.font.family.title
+                        color: Appearance.colors.colOnLayer0
+                    }
+                }
+
+                Item {
+                    implicitHeight: 16
+                }
+
+                // Schema-driven controls via ExtensionWidgetSettingsRenderer
+                Flickable {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: Math.min(contentHeight, extConfigOverlay.height - 120)
+                    contentHeight: schemaSection.implicitHeight
+                    clip: true
+
+                    ContentSection {
+                        id: schemaSection
+                        width: parent.width
+                        title: Translation.tr("Configuration")
+                        icon: "tune"
+
+                        Loader {
+                            id: schemaRenderer
+                            Layout.fillWidth: true
+                            asynchronous: true
+                            active: extConfigOverlay.overlayActive
+                            source: Qt.resolvedUrl("widgets/ExtensionWidgetSettingsRenderer.qml")
+                            Layout.preferredHeight: item ? item.implicitHeight : 0
+                        }
+
+                        Binding {
+                            target: schemaRenderer.item
+                            property: "extId"
+                            value: widgetsConfigRoot.extensionConfigExtId
+                            when: schemaRenderer.item !== null
+                        }
+
+                        Binding {
+                            target: schemaRenderer.item
+                            property: "schema"
+                            value: {
+                                let eId = widgetsConfigRoot.extensionConfigExtId;
+                                if (!eId)
+                                    return ({});
+                                let entry = WidgetExtensionManager.installedWidgets[eId];
+                                if (!entry)
+                                    return ({});
+                                return (entry.widgetJson || {}).configSchema || ({});
+                            }
+                            when: schemaRenderer.item !== null
+                        }
+                    }
+                }
             }
         }
+    }
+
+    ConfigSubPageHost {
+        id: subPageOverlay
+        anchors.fill: parent
+        z: 10
     }
 }

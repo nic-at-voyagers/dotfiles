@@ -19,21 +19,23 @@ MouseArea { // Notification group area
     property bool expanded: false
     property bool popup: false
     property real zoom: 1.0
-    property int lazyLimit: 2
+    // Keep only the latest collapsed preview; the count button still exposes
+    // the full group and expansion reveals the remaining notifications.
+    property int lazyLimit: 1
     property int entranceTrigger: -1
     property int globalIndex: 0
 
     // Entrance animation properties
     property real _entranceOpacity: 0
-    property real _entranceScale: 0.75
-    property real _entranceTranslateY: 35
+    property real _entranceScale: 0.65
+    property real _entranceTranslateY: 50
     property bool _entranceDone: false
 
     onEntranceTriggerChanged: {
         _entranceDone = false;
         _entranceOpacity = 0;
-        _entranceScale = 0.75;
-        _entranceTranslateY = 35;
+        _entranceScale = 0.65;
+        _entranceTranslateY = 50;
         Qt.callLater(function() {
             entranceAnim.start();
         });
@@ -42,8 +44,8 @@ MouseArea { // Notification group area
     Component.onCompleted: {
         _entranceDone = false;
         _entranceOpacity = 0;
-        _entranceScale = 0.75;
-        _entranceTranslateY = 35;
+        _entranceScale = 0.65;
+        _entranceTranslateY = 50;
         Qt.callLater(function() {
             entranceAnim.start();
         });
@@ -51,11 +53,11 @@ MouseArea { // Notification group area
 
     SequentialAnimation {
         id: entranceAnim
-        PauseAnimation { duration: Math.min(Math.max(root.globalIndex, 0), 15) * 35 }
+        PauseAnimation { duration: 150 + Math.min(Math.max(root.globalIndex, 0), 15) * 65 }
         ParallelAnimation {
-            NumberAnimation { target: root; property: "_entranceOpacity"; from: 0; to: 1; duration: 280; easing.type: Easing.OutCubic }
-            NumberAnimation { target: root; property: "_entranceScale"; from: 0.75; to: 1.0; duration: 350; easing.type: Easing.OutBack }
-            NumberAnimation { target: root; property: "_entranceTranslateY"; from: 35; to: 0; duration: 320; easing.type: Easing.OutCubic }
+            NumberAnimation { target: root; property: "_entranceOpacity"; from: 0; to: 1; duration: 320; easing.type: Easing.OutCubic }
+            NumberAnimation { target: root; property: "_entranceScale"; from: 0.65; to: 1.0; duration: 420; easing.type: Easing.OutBack; easing.overshoot: 0.8 }
+            NumberAnimation { target: root; property: "_entranceTranslateY"; from: 50; to: 0; duration: 380; easing.type: Easing.OutQuart }
         }
         PropertyAction { target: root; property: "_entranceDone"; value: true }
     }
@@ -68,7 +70,7 @@ MouseArea { // Notification group area
             }
         } else {
             lazyLoadTimer.stop();
-            lazyLimit = 2;
+            lazyLimit = 1;
         }
     }
 
@@ -87,6 +89,18 @@ MouseArea { // Notification group area
     }
     property real padding: 10 * zoom
     implicitHeight: background.implicitHeight
+    // Popup groups may use the scale entrance animation. Sidebar groups must stay
+    // at layout scale 1.0: their parent ListView owns the delegate geometry, and
+    // a transient scale there can make the next group paint over this one.
+    scale: popup ? (_entranceDone ? 1.0 : _entranceScale) : 1.0
+    Behavior on scale {
+        enabled: popup && !entranceAnim.running
+        NumberAnimation {
+            duration: 350
+            easing.type: Easing.OutBack
+            easing.overshoot: 0.8
+        }
+    }
 
     property real dragConfirmThreshold: 70 // Drag further to discard notification
     property real dismissOvershoot: 20 // Account for gaps and bouncy animations
@@ -155,11 +169,10 @@ MouseArea { // Notification group area
             }
         }
         onFinished: () => {
-            root.notifications.forEach(notif => {
-                Qt.callLater(() => {
-                    Notifications.discardNotification(notif.notificationId);
-                });
-            });
+            const ids = root.notifications.map(n => n.notificationId);
+            if (ids.length > 0) {
+                Notifications.discardMultipleNotifications(ids);
+            }
         }
     }
 
@@ -224,7 +237,13 @@ MouseArea { // Notification group area
             var u = root.width > 0 ? Math.min(1.0, Math.abs(root.xOffset) / root.width) : 0.0;
             return (1.0 - u * u * u) * (1.0 - u * u * u);
         }
-        scale: root._entranceDone ? 1.0 : root._entranceScale
+        scale: 1.0
+        // Fix: translateY only for popup. In sidebar the +50px shift pushed the card
+        // into the next item's ListView slot causing visible overlap.
+        transform: Translate {
+            y: (root._entranceDone || !root.popup) ? 0 : root._entranceTranslateY
+        }
+
         Behavior on opacity {
             enabled: !entranceAnim.running
             NumberAnimation {
@@ -232,18 +251,6 @@ MouseArea { // Notification group area
                 easing.type: Appearance.animation.elementMove.type
                 easing.bezierCurve: Appearance.animationCurves.expressiveFastSpatial
             }
-        }
-
-        Behavior on scale {
-            enabled: !entranceAnim.running
-            NumberAnimation {
-                duration: 350
-                easing.type: Easing.OutBack
-            }
-        }
-
-        transform: Translate {
-            y: root._entranceDone ? 0 : root._entranceTranslateY
         }
 
         Behavior on anchors.leftMargin {
@@ -256,10 +263,18 @@ MouseArea { // Notification group area
         }
 
         clip: true
-        implicitHeight: root.expanded ? row.implicitHeight + padding * 2 : Math.min(80 * root.zoom, row.implicitHeight + padding * 2)
+        // Reserve the height of every visible preview; expanded groups grow with
+        // the full Column + Repeater body as lazy loading adds more delegates.
+        implicitHeight: row.implicitHeight + root.padding * 2
 
         Behavior on implicitHeight {
             id: implicitHeightAnim
+            // Only animate implicitHeight when manually expanding/collapsing.
+            // When NOT expanded, new notifications arriving can cause row.implicitHeight
+            // to momentarily resolve to a lower value (before layout settles), triggering
+            // this Behavior and animating the card to a wrong intermediate height — which
+            // desynchronizes the outer ListView's item positions, producing the overlap look.
+            enabled: root.expanded
             animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
         }
 
@@ -367,30 +382,46 @@ MouseArea { // Notification group area
                     }
                 }
 
-                StyledListView { // Notification body (expanded)
+                Column { // Notification body (expanded)
                     id: notificationsColumn
-                    implicitHeight: contentHeight
                     Layout.fillWidth: true
                     spacing: expanded ? 5 : 3
-                    // clip: true
-                    interactive: false
+
+                    // This content is not independently scrollable: the outer
+                    // notification center owns scrolling. Using a nested ListView
+                    // here made implicitHeight depend on its estimated contentHeight;
+                    // during rapid model updates it could report one delegate while
+                    // two were already painted, so the outer ListView placed the next
+                    // group too early. A positioner derives its height directly from
+                    // the delegates and keeps both layout levels synchronized.
+                    property int dragIndex: -1
+                    property real dragDistance: 0
+
+                    function resetDrag() {
+                        dragIndex = -1;
+                        dragDistance = 0;
+                    }
+
                     Behavior on spacing {
                         animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
                     }
-                    model: ScriptModel {
-                        values: root.notifications.slice().reverse().slice(0, root.lazyLimit)
-                    }
-                    delegate: NotificationItem {
-                        required property int index
-                        required property var modelData
-                        notificationObject: modelData
-                        expanded: root.expanded
-                        zoom: root.zoom
-                        onlyNotification: (root.notificationCount === 1)
-                        opacity: (!root.expanded && index == 1 && root.notificationCount > 2) ? 0.5 : 1
-                        visible: root.expanded || (index < 2)
-                        anchors.left: parent?.left
-                        anchors.right: parent?.right
+
+                    Repeater {
+                        model: ScriptModel {
+                            values: root.notifications.slice().reverse().slice(0, root.lazyLimit)
+                        }
+                        delegate: NotificationItem {
+                            required property int index
+                            required property var modelData
+                            width: notificationsColumn.width
+                            height: implicitHeight
+                            qmlParent: notificationsColumn
+                            notificationObject: modelData
+                            expanded: root.expanded
+                            zoom: root.zoom
+                            onlyNotification: (root.notificationCount === 1)
+                            visible: root.expanded || (index < 1)
+                        }
                     }
                 }
             }

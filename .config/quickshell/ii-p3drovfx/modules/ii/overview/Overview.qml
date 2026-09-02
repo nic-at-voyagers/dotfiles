@@ -4,6 +4,7 @@ import qs.modules.common
 import qs.modules.common.widgets
 import Qt.labs.synchronizer
 import QtQuick
+import QtQuick.Effects
 import QtQuick.Controls
 import QtQuick.Layouts
 import Quickshell
@@ -19,7 +20,7 @@ Scope {
 
     Loader {
         id: overviewVariantsLoader
-        active: !GlobalStates.searchConnectActive
+        active: !GlobalStates.searchConnectActive && !GlobalStates.floatingNotchOwnsSearch
         sourceComponent: Component {
             Variants {
                 id: overviewVariant
@@ -31,17 +32,31 @@ Scope {
                 LazyLoader {
                     id: realOverviewLoader
                     required property var modelData
+                    readonly property HyprlandMonitor monitor: Hyprland.monitorFor(modelData)
                     property int monitorIndex: overviewVariant.variantModel.indexOf(modelData)
-                    property bool monitorIsFocused: (Hyprland.focusedMonitor?.id == monitorIndex)
-                    active: monitorIsFocused
+                    property bool monitorIsFocused: (Hyprland.focusedMonitor?.name === monitor?.name) || (Hyprland.focusedMonitor?.id == monitorIndex)
+                    // Keep the focused window alive while it is visible or
+                    // while its closing animation still has pixels on screen.
+                    // The Scope and IPC shortcuts remain loaded, but this
+                    // expensive per-monitor PanelWindow is destroyed otherwise.
+                    property bool visualActive: false
+                    active: monitorIsFocused && (GlobalStates.overviewOpen || visualActive)
+
+                    onMonitorIsFocusedChanged: {
+                        if (!monitorIsFocused)
+                            visualActive = false;
+                    }
 
                     component: PanelWindow {
                         id: root
 
+                        screen: realOverviewLoader.modelData
                         readonly property bool monitorIsFocused: realOverviewLoader.monitorIsFocused
                         readonly property int monitorIndex: realOverviewLoader.monitorIndex
+                        readonly property bool isBottomBar: !Config.options.bar.vertical && Config.options.bar.bottom
 
                         readonly property bool isScrollingLayout: Persistent.states.hyprland.layout === "scrolling"
+                        readonly property string animStyle: (GlobalStates.searchCenterMode || Config.options.search.suggestions.enable) ? "zoom" : (Config.options.overview.animationStyle ?? "bounce")
                         property string searchingText: ""
 
                         WlrLayershell.namespace: "quickshell:overview"
@@ -49,83 +64,101 @@ Scope {
                         WlrLayershell.keyboardFocus: GlobalStates.overviewOpen ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
                         color: "transparent"
 
-                        property var zoomLevels: {  // has to be reverted compared to background
-                            "in": {
-                                default: 1,
-                                zoomed: 1.04
-                            },
-                            "out": {
-                                default: 1.04,
-                                zoomed: 1
+                        property int animDurationEnter: Math.round(420 * Appearance.animMultiplier)
+                        property int animDurationExit: Math.round(260 * Appearance.animMultiplier)
+                        property list<real> animCurveEnter: Appearance.animationCurves.expressiveFastSpatial
+                        property list<real> animCurveExit: Appearance.animationCurves.emphasizedAccel
+                        readonly property bool overviewShouldShow: LauncherSearch.query === ""
+                            && !GlobalStates.searchOnlyMode
+                            && !GlobalStates.searchCenterMode
+                            && !Config.options.search.suggestions.enable
+                            && (Config?.options.overview.enable ?? true)
+                        property real overviewRevealProgress: 1.0
+                        property real overviewFadeProgress: 1.0
+                        property bool _overviewRevealInitialized: false
+
+                        ParallelAnimation {
+                            id: overviewRevealAnim
+                            NumberAnimation {
+                                target: root
+                                property: "overviewRevealProgress"
+                                from: 0.0
+                                to: 1.0
+                                duration: root.animDurationEnter
+                                easing.type: Easing.BezierSpline
+                                easing.bezierCurve: root.animCurveEnter
+                            }
+                            NumberAnimation {
+                                target: root
+                                property: "overviewFadeProgress"
+                                from: 0.0
+                                to: 1.0
+                                duration: root.animDurationEnter
+                                easing.type: Easing.OutCubic
                             }
                         }
 
-                        readonly property bool isZoomInStyle: Config.options.overview.scrollingStyle.zoomStyle === "in"
-                        readonly property bool showOpeningAnimation: Config.options.overview.showOpeningAnimation
+                        function syncOverviewReveal() {
+                            if (!root._overviewRevealInitialized)
+                                return;
 
-                        property real defaultRatio: isZoomInStyle ? zoomLevels.in.default : zoomLevels.out.default
-                        property real zoomedRatio: isZoomInStyle ? zoomLevels.in.zoomed : zoomLevels.out.zoomed
+                            const shouldShow = root.overviewShouldShow;
+                            overviewRevealAnim.stop();
 
-                        property bool isResettingZoom: false
-                        property real scaleAnimated: showOpeningAnimation ? GlobalStates.overviewOpen ? zoomedRatio : defaultRatio : 1
-                        property real effectiveScale: showOpeningAnimation ? zoomedRatio - scaleAnimated + 1 : 1
-
-                        onIsZoomInStyleChanged: isResettingZoom = true
-                        onScaleAnimatedChanged: {
-                            if (scaleAnimated === defaultRatio) {
-                                isResettingZoom = false;
+                            if (!GlobalStates.overviewOpen) {
+                                root.overviewRevealProgress = shouldShow ? 1.0 : 0.0;
+                                root.overviewFadeProgress = shouldShow ? 1.0 : 0.0;
+                                return;
                             }
+
+                            if (!shouldShow) {
+                                root.overviewRevealProgress = 0.0;
+                                root.overviewFadeProgress = 0.0;
+                                return;
+                            }
+
+                            // Force a real 0 -> 1 transition. This is intentionally
+                            // explicit instead of relying on a Behavior over a binding.
+                            root.overviewRevealProgress = 0.0;
+                            root.overviewFadeProgress = 0.0;
+                            Qt.callLater(() => {
+                                if (GlobalStates.overviewOpen && LauncherSearch.query === "" && root.overviewShouldShow)
+                                    overviewRevealAnim.start();
+                            });
                         }
 
-                        // Animation timing constants — single source of truth
-                        // Small bounce on enter (expressiveFastSpatial has overshoot ~1.2x)
-                        readonly property int animDurationEnter: 480
-                        readonly property int animDurationExit: 200
-                        readonly property list<real> animCurveEnter: Appearance.animationCurves.expressiveFastSpatial
-                        readonly property list<real> animCurveExit: Appearance.animationCurves.emphasizedAccel
-
-                        // Track if we are in exit animation so window stays visible during slide-out
-                        property bool exitAnimating: false
-                        Timer {
-                            id: exitAnimTimer
-                            interval: root.animDurationExit + 30
-                            onTriggered: {
-                                root.exitAnimating = false;
-                                searchWidget.cancelSearch();
-                            }
+                        function consumePendingSearchQuery() {
+                            if (!GlobalStates.activeSearchQuery)
+                                return;
+                            root.setSearchingText(GlobalStates.activeSearchQuery);
+                            GlobalStates.activeSearchQuery = "";
                         }
 
                         Connections {
-                            target: GlobalStates
-                            function onOverviewOpenChanged() {
-                                if (!GlobalStates.overviewOpen) {
-                                    root.exitAnimating = true;
-                                    exitAnimTimer.restart();
-                                    searchWidget.disableExpandAnimation();
-                                    overviewScope.dontAutoCancelSearch = false;
-                                    GlobalStates.searchOnlyMode = false;
-                                } else {
-                                    root.exitAnimating = false;
-                                    exitAnimTimer.stop();
-                                    if (!overviewScope.dontAutoCancelSearch) {
-                                        searchWidget.cancelSearch();
-                                    }
-                                    delayedGrabTimer.start();
-                                }
+                            target: LauncherSearch
+                            function onQueryChanged() {
+                                root.syncOverviewReveal();
                             }
                         }
 
-                        visible: {
-                            if (isResettingZoom)
-                                return false;
-                            if (!showOpeningAnimation)
-                                return GlobalStates.overviewOpen || exitAnimating;
-
-                            return isZoomInStyle ? scaleAnimated > defaultRatio : scaleAnimated < defaultRatio;
+                        Component.onCompleted: {
+                            realOverviewLoader.visualActive = true;
+                            root.overviewRevealProgress = root.overviewShouldShow && LauncherSearch.query === "" ? 1.0 : 0.0;
+                            root.overviewFadeProgress = root.overviewRevealProgress;
+                            root._overviewRevealInitialized = true;
+                            root.consumePendingSearchQuery();
                         }
 
-                        Behavior on scaleAnimated {
-                            animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(root)
+                        visible: GlobalStates.overviewOpen || searchWidgetWrapper.slideOpacity > 0
+                        onVisibleChanged: {
+                            if (root.visible)
+                                realOverviewLoader.visualActive = true;
+                            else if (!GlobalStates.overviewOpen)
+                                realOverviewLoader.visualActive = false;
+                        }
+
+                        mask: Region {
+                            item: GlobalStates.overviewOpen ? contentItem : null
                         }
 
                         anchors {
@@ -135,7 +168,7 @@ Scope {
                             right: true
                         }
                         property int barSize: Config.options.bar.vertical ? Appearance.sizes.verticalBarWindowWidth : Appearance.sizes.barHeight
-                        property int margin: isZoomInStyle ? barSize : barSize * 2
+                        property int margin: barSize * 2
                         margins {
                             top: -margin * 2
                             bottom: -margin * 2
@@ -143,15 +176,27 @@ Scope {
                             right: -margin * 2
                         }
 
+                        Connections {
+                            target: GlobalStates
+                            function onOverviewOpenChanged() {
+                                if (!GlobalStates.overviewOpen) {
+                                    searchWidget.disableExpandAnimation();
+                                    overviewScope.dontAutoCancelSearch = false;
+                                } else {
+                                    if (!overviewScope.dontAutoCancelSearch) {
+                                        searchWidget.cancelSearch();
+                                    }
+                                    root.consumePendingSearchQuery();
+                                    delayedGrabTimer.start();
+                                }
+                            }
+                        }
+
                         HyprlandFocusGrab {
                             id: grab
                             windows: [root]
-                            property bool canBeActive: root.monitorIsFocused
+                            property bool canBeActive: root.monitorIsFocused || GlobalStates.overviewOpen
                             active: false
-                            onCleared: () => {
-                                if (!active)
-                                    GlobalStates.overviewOpen = false;
-                            }
                         }
 
                         Keys.onPressed: event => {
@@ -192,6 +237,7 @@ Scope {
 
                             MouseArea { // We could have used PanelWindow.mask to detect this, but this is more stable
                                 anchors.fill: parent
+                                enabled: GlobalStates.overviewOpen
                                 onClicked: GlobalStates.overviewOpen = false
                             }
 
@@ -202,17 +248,34 @@ Scope {
                                 implicitWidth: isNotchMode ? GlobalStates.activeSearchWidth : searchWidget.implicitWidth
                                 z: 999
                                 visible: !isNotchMode
+                                height: isNotchMode ? implicitHeight : searchWidget.height
 
-                                // Slide from absolute top of screen — offset large enough to hide above top edge
-                                readonly property real slideOffset: (Config.options.bar.bottom ? 1 : -1) * (implicitHeight + root.margin * 2 + Appearance.sizes.elevationMargin + 40)
+                                // Slide from top/bottom — direction matches top bar / bottom bar
+                                readonly property real slideOffset: (root.isBottomBar ? 1 : -1) * (implicitHeight + root.margin * 2 + Appearance.sizes.elevationMargin + 40)
+                                readonly property real initialYOffset: (GlobalStates.searchCenterMode || Config.options.search.suggestions.enable) ? 0 : (root.animStyle === "zoom" ? (root.isBottomBar ? 20 : -20) : searchWidgetWrapper.slideOffset)
 
                                 // Driven directly — no Behavior, to avoid QML skipping anim while invisible
-                                property real slideY: slideOffset
+                                property real slideY: initialYOffset
                                 property real slideOpacity: 0.0
 
                                 opacity: isNotchMode ? 0.0 : slideOpacity
-                                transform: Translate {
-                                    y: searchWidgetWrapper.slideY
+                                transform: [
+                                    Translate {
+                                        y: searchWidgetWrapper.slideY
+                                    },
+                                    Scale {
+                                        origin.x: searchWidgetWrapper.width / 2
+                                        origin.y: searchWidgetWrapper.height / 2
+                                        xScale: root.animStyle === "zoom" ? (0.92 + 0.08 * searchWidgetWrapper.slideOpacity) : 1.0
+                                        yScale: root.animStyle === "zoom" ? (0.92 + 0.08 * searchWidgetWrapper.slideOpacity) : 1.0
+                                    }
+                                ]
+
+                                layer.enabled: !isNotchMode
+                                layer.effect: MultiEffect {
+                                    blurEnabled: (1.0 - searchWidgetWrapper.slideOpacity) > 0.001
+                                    blurMax: 64.0
+                                    blur: (1.0 - searchWidgetWrapper.slideOpacity) * 1.0
                                 }
 
                                 Timer {
@@ -220,7 +283,7 @@ Scope {
                                     interval: 16 // 1 frame at 60fps — ensures QML paints reset before animating
                                     repeat: false
                                     onTriggered: {
-                                        slideInYAnim.from = searchWidgetWrapper.slideOffset;
+                                        slideInYAnim.from = searchWidgetWrapper.initialYOffset;
                                         slideInYAnim.to = 0;
                                         slideInOpacityAnim.from = 0.0;
                                         slideInOpacityAnim.to = 1.0;
@@ -232,15 +295,20 @@ Scope {
                                     slideOutParallel.stop();
                                     slideInParallel.stop();
                                     slideInStartTimer.stop();
-                                    searchWidgetWrapper.slideY = searchWidgetWrapper.slideOffset;
+                                    searchWidgetWrapper.slideY = searchWidgetWrapper.initialYOffset;
                                     searchWidgetWrapper.slideOpacity = 0.0;
-                                    slideInStartTimer.start();
+                                    slideInYAnim.from = searchWidgetWrapper.initialYOffset;
+                                    slideInYAnim.to = 0;
+                                    slideInOpacityAnim.from = 0.0;
+                                    slideInOpacityAnim.to = 1.0;
+                                    slideInParallel.start();
                                 }
 
                                 function triggerSlideOut() {
                                     slideInParallel.stop();
+                                    slideOutParallel.stop();
                                     slideOutYAnim.from = searchWidgetWrapper.slideY;
-                                    slideOutYAnim.to = searchWidgetWrapper.slideOffset;
+                                    slideOutYAnim.to = searchWidgetWrapper.initialYOffset;
                                     slideOutOpacityAnim.from = searchWidgetWrapper.slideOpacity;
                                     slideOutOpacityAnim.to = 0.0;
                                     slideOutParallel.start();
@@ -253,16 +321,15 @@ Scope {
                                         target: searchWidgetWrapper
                                         property: "slideY"
                                         duration: root.animDurationEnter
-                                        easing.type: Easing.BezierSpline
-                                        easing.bezierCurve: root.animCurveEnter // bounce curve
+                                        easing.type: root.animStyle === "bounce" ? Easing.OutBack : Easing.OutCubic
+                                        easing.overshoot: root.animStyle === "bounce" ? 1.2 : 0
                                     }
                                     NumberAnimation {
                                         id: slideInOpacityAnim
                                         target: searchWidgetWrapper
                                         property: "slideOpacity"
                                         duration: root.animDurationEnter
-                                        easing.type: Easing.BezierSpline
-                                        easing.bezierCurve: Appearance.animationCurves.emphasizedDecel // no bounce for opacity
+                                        easing.type: Easing.OutCubic
                                     }
                                 }
 
@@ -273,16 +340,17 @@ Scope {
                                         target: searchWidgetWrapper
                                         property: "slideY"
                                         duration: root.animDurationExit
-                                        easing.type: Easing.BezierSpline
-                                        easing.bezierCurve: root.animCurveExit
+                                        easing.type: Easing.InCubic
                                     }
                                     NumberAnimation {
                                         id: slideOutOpacityAnim
                                         target: searchWidgetWrapper
                                         property: "slideOpacity"
                                         duration: root.animDurationExit
-                                        easing.type: Easing.BezierSpline
-                                        easing.bezierCurve: root.animCurveExit
+                                        easing.type: Easing.InCubic
+                                        onFinished: {
+                                            root.isClosing = false;
+                                        }
                                     }
                                 }
 
@@ -317,12 +385,14 @@ Scope {
                                 }
 
                                 width: implicitWidth
-                                height: implicitHeight
-                                y: Config.options.bar.bottom ? (parent.height - height - (root.margin * 2 + Appearance.sizes.elevationMargin)) : (root.margin * 2 + Appearance.sizes.elevationMargin)
+                                y: GlobalStates.searchCenterMode
+                                    ? (parent.height * Config.options.search.centerVerticalRatio - 29)
+                                    : (root.isBottomBar ? (parent.height - searchWidget.implicitHeight - (root.margin * 2 + Appearance.sizes.elevationMargin)) : (root.margin * 2 + Appearance.sizes.elevationMargin))
                                 anchors.horizontalCenter: parent.horizontalCenter
 
                                 SearchWidget {
                                     id: searchWidget
+                                    shadowOpacity: searchWidgetWrapper.slideOpacity
                                     anchors.horizontalCenter: parent.horizontalCenter
                                     Synchronizer on searchingText {
                                         property alias source: root.searchingText
@@ -332,48 +402,34 @@ Scope {
 
                             Loader { // Classic overview
                                 id: overviewLoader
-                                y: Config.options.bar.bottom ? (searchWidgetWrapper.y - height - 10) : (searchWidgetWrapper.y + searchWidgetWrapper.height + 10)
-                                height: implicitHeight
+                                anchors.bottom: root.isBottomBar ? searchWidgetWrapper.top : undefined
+                                anchors.top: root.isBottomBar ? undefined : searchWidgetWrapper.bottom
                                 anchors.horizontalCenter: parent.horizontalCenter
-                                active: (Config?.options.overview.enable ?? true) && !root.isScrollingLayout
+                                active: root.visible && !GlobalStates.searchOnlyMode && !GlobalStates.searchCenterMode && !Config.options.search.suggestions.enable && (Config?.options.overview.enable ?? true) && !root.isScrollingLayout
+                                opacity: root.overviewShouldShow ? searchWidgetWrapper.slideOpacity * root.overviewFadeProgress : 0.0
 
-                                readonly property bool isOverviewVisible: GlobalStates.overviewOpen && (root.searchingText == "") && !GlobalStates.searchOnlyMode && !Config.options.search.alwaysListApps
-
-                                visible: opacity > 0
-
-                                // Smooth slide, fade and scale when opening/closing or typing
-                                opacity: isOverviewVisible ? 1.0 : 0.0
-                                scale: isOverviewVisible ? root.effectiveScale : root.effectiveScale * 0.92
-
-                                Behavior on opacity {
-                                    NumberAnimation {
-                                        duration: overviewLoader.isOverviewVisible ? root.animDurationEnter : root.animDurationExit
-                                        easing.type: Easing.BezierSpline
-                                        easing.bezierCurve: overviewLoader.isOverviewVisible ? root.animCurveEnter : root.animCurveExit
-                                    }
+                                layer.enabled: overviewLoader.opacity < 0.999
+                                layer.effect: MultiEffect {
+                                    blurEnabled: overviewLoader.opacity < 0.999
+                                    blurMax: 64.0
+                                    blur: (1.0 - Math.min(1.0, Math.max(0.0, overviewLoader.opacity))) * 1.0
                                 }
 
-                                Behavior on scale {
-                                    NumberAnimation {
-                                        duration: overviewLoader.isOverviewVisible ? root.animDurationEnter : root.animDurationExit
-                                        easing.type: Easing.BezierSpline
-                                        easing.bezierCurve: overviewLoader.isOverviewVisible ? root.animCurveEnter : root.animCurveExit
+                                transform: [
+                                    Translate {
+                                        y: root.animStyle === "zoom" ? ((1.0 - Math.min(1.0, Math.max(0.0, overviewLoader.opacity))) * (root.isBottomBar ? 30 : -30)) : searchWidgetWrapper.slideY + ((1.0 - root.overviewRevealProgress) * (root.isBottomBar ? -30 : 30))
+                                    },
+                                    Scale {
+                                        origin.x: overviewLoader.implicitWidth / 2
+                                        origin.y: overviewLoader.implicitHeight / 2
+                                        xScale: root.animStyle === "zoom" ? (0.92 + 0.08 * Math.min(1.0, Math.max(0.0, overviewLoader.opacity))) : 1.0
+                                        yScale: root.animStyle === "zoom" ? (0.92 + 0.08 * Math.min(1.0, Math.max(0.0, overviewLoader.opacity))) : 1.0
                                     }
-                                }
-
-                                transform: Translate {
-                                    y: overviewLoader.isOverviewVisible ? 0 : (Config.options.bar.bottom ? -30 : 30)
-                                    Behavior on y {
-                                        NumberAnimation {
-                                            duration: overviewLoader.isOverviewVisible ? root.animDurationEnter : root.animDurationExit
-                                            easing.type: Easing.BezierSpline
-                                            easing.bezierCurve: overviewLoader.isOverviewVisible ? root.animCurveEnter : root.animCurveExit
-                                        }
-                                    }
-                                }
+                                ]
 
                                 sourceComponent: OverviewWidget {
                                     panelWindow: root
+                                    visible: root.overviewShouldShow && root.overviewFadeProgress > 0.001
                                     monitorIndex: root.monitorIndex
                                 }
                             }
@@ -381,45 +437,32 @@ Scope {
                             Loader { // Scrolling overview
                                 id: scrollingOverviewLoader
                                 anchors.fill: parent
-                                active: (Config?.options.overview.enable ?? true) && root.isScrollingLayout
+                                active: root.visible && !GlobalStates.searchOnlyMode && !GlobalStates.searchCenterMode && !Config.options.search.suggestions.enable && (Config?.options.overview.enable ?? true) && root.isScrollingLayout
+                                opacity: root.overviewShouldShow ? searchWidgetWrapper.slideOpacity * root.overviewFadeProgress : 0.0
 
-                                readonly property bool isOverviewVisible: GlobalStates.overviewOpen && (root.searchingText == "") && !GlobalStates.searchOnlyMode && !Config.options.search.alwaysListApps
-
-                                visible: opacity > 0
-
-                                // Smooth slide, fade and scale when opening/closing or typing
-                                opacity: isOverviewVisible ? 1.0 : 0.0
-                                scale: isOverviewVisible ? root.effectiveScale : root.effectiveScale * 0.92
-
-                                Behavior on opacity {
-                                    NumberAnimation {
-                                        duration: scrollingOverviewLoader.isOverviewVisible ? root.animDurationEnter : root.animDurationExit
-                                        easing.type: Easing.BezierSpline
-                                        easing.bezierCurve: scrollingOverviewLoader.isOverviewVisible ? root.animCurveEnter : root.animCurveExit
-                                    }
+                                layer.enabled: scrollingOverviewLoader.opacity < 0.999
+                                layer.effect: MultiEffect {
+                                    blurEnabled: scrollingOverviewLoader.opacity < 0.999
+                                    blurMax: 64.0
+                                    blur: (1.0 - Math.min(1.0, Math.max(0.0, scrollingOverviewLoader.opacity))) * 1.0
                                 }
 
-                                Behavior on scale {
-                                    NumberAnimation {
-                                        duration: scrollingOverviewLoader.isOverviewVisible ? root.animDurationEnter : root.animDurationExit
-                                        easing.type: Easing.BezierSpline
-                                        easing.bezierCurve: scrollingOverviewLoader.isOverviewVisible ? root.animCurveEnter : root.animCurveExit
+                                transform: [
+                                    Translate {
+                                        y: root.animStyle === "zoom" ? ((1.0 - Math.min(1.0, Math.max(0.0, scrollingOverviewLoader.opacity))) * (root.isBottomBar ? 30 : -30)) : searchWidgetWrapper.slideY + ((1.0 - root.overviewRevealProgress) * (root.isBottomBar ? -30 : 30))
+                                    },
+                                    Scale {
+                                        origin.x: scrollingOverviewLoader.width / 2
+                                        origin.y: scrollingOverviewLoader.height / 2
+                                        xScale: root.animStyle === "zoom" ? (0.92 + 0.08 * Math.min(1.0, Math.max(0.0, scrollingOverviewLoader.opacity))) : 1.0
+                                        yScale: root.animStyle === "zoom" ? (0.92 + 0.08 * Math.min(1.0, Math.max(0.0, scrollingOverviewLoader.opacity))) : 1.0
                                     }
-                                }
+                                ]
 
-                                transform: Translate {
-                                    y: scrollingOverviewLoader.isOverviewVisible ? 0 : (Config.options.bar.bottom ? -30 : 30)
-                                    Behavior on y {
-                                        NumberAnimation {
-                                            duration: scrollingOverviewLoader.isOverviewVisible ? root.animDurationEnter : root.animDurationExit
-                                            easing.type: Easing.BezierSpline
-                                            easing.bezierCurve: scrollingOverviewLoader.isOverviewVisible ? root.animCurveEnter : root.animCurveExit
-                                        }
-                                    }
-                                }
                                 sourceComponent: ScrollingOverviewWidget {
                                     anchors.fill: parent
                                     panelWindow: root
+                                    visible: root.overviewShouldShow && root.overviewFadeProgress > 0.001
                                     monitorIndex: root.monitorIndex
                                 }
                             }
@@ -430,50 +473,43 @@ Scope {
         }
     }
 
-    onSetSearchingTextRequested: (text) => {
-        if (GlobalStates.searchConnectActive) {
-            GlobalStates.activeSearchQuery = text
+    onSetSearchingTextRequested: text => {
+        if (GlobalStates.searchConnectActive || GlobalStates.floatingNotchOwnsSearch) {
+            GlobalStates.activeSearchQuery = text;
+        }
+    }
+
+    function togglePrefixedSearch(prefix) {
+        GlobalStates.superReleaseMightTrigger = false;
+        if (GlobalStates.overviewOpen && overviewScope.dontAutoCancelSearch && LauncherSearch.query.startsWith(prefix)) {
+            GlobalStates.overviewOpen = false;
+            return;
+        }
+        overviewScope.dontAutoCancelSearch = true;
+        if (GlobalStates.overviewOpen) {
+            overviewScope.setSearchingTextRequested(prefix);
+        } else {
+            // The default overview is lazy-loaded. Keep the prefix until its
+            // PanelWindow exists so the first shortcut press is not lost.
+            GlobalStates.activeSearchQuery = prefix;
+            GlobalStates.overviewOpen = true;
         }
     }
 
     function toggleClipboard() {
-        if (GlobalStates.overviewOpen && overviewScope.dontAutoCancelSearch) {
-            GlobalStates.overviewOpen = false;
-            return;
-        }
-        overviewScope.dontAutoCancelSearch = true;
-        overviewScope.setSearchingTextRequested(Config.options.search.prefix.clipboard);
-        GlobalStates.overviewOpen = true;
+        togglePrefixedSearch(Config.options.search.prefix.clipboard);
     }
 
     function toggleEmojis() {
-        if (GlobalStates.overviewOpen && overviewScope.dontAutoCancelSearch) {
-            GlobalStates.overviewOpen = false;
-            return;
-        }
-        overviewScope.dontAutoCancelSearch = true;
-        overviewScope.setSearchingTextRequested(Config.options.search.prefix.emojis);
-        GlobalStates.overviewOpen = true;
+        togglePrefixedSearch(Config.options.search.prefix.emojis);
     }
 
     function toggleBluetooth() {
-        if (GlobalStates.overviewOpen && overviewScope.dontAutoCancelSearch) {
-            GlobalStates.overviewOpen = false;
-            return;
-        }
-        overviewScope.dontAutoCancelSearch = true;
-        overviewScope.setSearchingTextRequested(Config.options.search.prefix.bluetooth);
-        GlobalStates.overviewOpen = true;
+        togglePrefixedSearch(Config.options.search.prefix.bluetooth);
     }
 
     function toggleMaterialSymbols() {
-        if (GlobalStates.overviewOpen && overviewScope.dontAutoCancelSearch) {
-            GlobalStates.overviewOpen = false;
-            return;
-        }
-        overviewScope.dontAutoCancelSearch = true;
-        overviewScope.setSearchingTextRequested(Config.options.search.prefix.materialSymbols);
-        GlobalStates.overviewOpen = true;
+        togglePrefixedSearch(Config.options.search.prefix.materialSymbols);
     }
 
     IpcHandler {
@@ -498,15 +534,19 @@ Scope {
             GlobalStates.superReleaseMightTrigger = false;
         }
         function clipboardToggle() {
+            GlobalStates.superReleaseMightTrigger = false;
             overviewScope.toggleClipboard();
         }
         function bluetoothToggle() {
+            GlobalStates.superReleaseMightTrigger = false;
             overviewScope.toggleBluetooth();
         }
         function materialSymbolsToggle() {
+            GlobalStates.superReleaseMightTrigger = false;
             overviewScope.toggleMaterialSymbols();
         }
         function searchOnlyToggle() {
+            GlobalStates.superReleaseMightTrigger = false;
             if (GlobalStates.overviewOpen) {
                 GlobalStates.overviewOpen = false;
             } else {
@@ -570,7 +610,8 @@ Scope {
 
         onReleased: {
             const now = Date.now();
-            if (now - _lastToggleTime < 50) return;
+            if (now - _lastToggleTime < 50)
+                return;
             _lastToggleTime = now;
 
             if (!GlobalStates.superReleaseMightTrigger) {
@@ -593,6 +634,7 @@ Scope {
         description: "Toggle clipboard query on overview widget"
 
         onPressed: {
+            GlobalStates.superReleaseMightTrigger = false;
             overviewScope.toggleClipboard();
         }
     }
@@ -602,6 +644,7 @@ Scope {
         description: "Toggle emoji query on overview widget"
 
         onPressed: {
+            GlobalStates.superReleaseMightTrigger = false;
             overviewScope.toggleEmojis();
         }
     }
@@ -611,6 +654,7 @@ Scope {
         description: "Toggle Material Symbols search on overview widget"
 
         onPressed: {
+            GlobalStates.superReleaseMightTrigger = false;
             overviewScope.toggleMaterialSymbols();
         }
     }

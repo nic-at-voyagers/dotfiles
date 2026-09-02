@@ -184,16 +184,20 @@ ContentPage {
 
         // Big primary toggle button
         RippleButton {
+            id: mirrorToggleBtn
+            readonly property bool isRunning: KdeConnectService.scrcpyRunning || PhoneScrcpyService.mirrorRunning
+            readonly property bool isLaunching: KdeConnectService.scrcpyLaunching || PhoneScrcpyService.mirrorLaunching
+
             Layout.fillWidth: true
             Layout.preferredHeight: 56
             buttonRadius: Appearance.rounding.normal
-            colBackground: KdeConnectService.scrcpyRunning
+            colBackground: mirrorToggleBtn.isRunning
                 ? Appearance.colors.colErrorContainer
                 : Appearance.colors.colPrimaryContainer
-            colBackgroundHover: KdeConnectService.scrcpyRunning
+            colBackgroundHover: mirrorToggleBtn.isRunning
                 ? Appearance.colors.colErrorContainerHover
                 : Appearance.colors.colPrimaryContainerHover
-            colRipple: KdeConnectService.scrcpyRunning
+            colRipple: mirrorToggleBtn.isRunning
                 ? Appearance.colors.colErrorContainerActive
                 : Appearance.colors.colPrimaryContainerActive
             enabled: root._ready
@@ -203,31 +207,33 @@ ContentPage {
                 spacing: 10
                 MaterialSymbol {
                     Layout.alignment: Qt.AlignVCenter
-                    text: KdeConnectService.scrcpyRunning ? "stop_circle" : "play_circle"
+                    text: mirrorToggleBtn.isLaunching ? "sync" : (mirrorToggleBtn.isRunning ? "stop_circle" : "play_circle")
                     iconSize: 24
-                    color: KdeConnectService.scrcpyRunning
+                    color: mirrorToggleBtn.isRunning
                         ? Appearance.colors.colOnErrorContainer
                         : Appearance.colors.colOnPrimaryContainer
-                    fill: KdeConnectService.scrcpyRunning ? 1.0 : 0.0
+                    fill: mirrorToggleBtn.isRunning ? 1.0 : 0.0
                 }
                 StyledText {
                     Layout.fillWidth: true
-                    text: KdeConnectService.scrcpyRunning
-                        ? Translation.tr("Kill scrcpy")
-                        : Translation.tr("Launch scrcpy")
+                    text: mirrorToggleBtn.isLaunching
+                        ? Translation.tr("Launching scrcpy…")
+                        : (mirrorToggleBtn.isRunning ? Translation.tr("Kill scrcpy") : Translation.tr("Launch scrcpy"))
                     font.pixelSize: Appearance.font.pixelSize.normal
                     font.weight: Font.DemiBold
-                    color: KdeConnectService.scrcpyRunning
+                    color: mirrorToggleBtn.isRunning
                         ? Appearance.colors.colOnErrorContainer
                         : Appearance.colors.colOnPrimaryContainer
                 }
             }
 
             onClicked: {
-                if (KdeConnectService.scrcpyRunning)
+                if (KdeConnectService.scrcpyRunning || PhoneScrcpyService.mirrorRunning) {
+                    PhoneScrcpyService.stopMirror()
                     KdeConnectService.killScrcpy()
-                else
-                    KdeConnectService.launchScrcpy(KdeConnectService.activeDeviceId)
+                } else {
+                    PhoneScrcpyService.launchMirror()
+                }
             }
         }
 
@@ -292,7 +298,9 @@ ContentPage {
                 }
                 onClicked: KdeConnectService.promptWirelessConnect(KdeConnectService.activeDeviceId)
                 StyledToolTip {
-                    text: Translation.tr("Prompt for IP:port and switch to wireless mode")
+                    text: Config.options.phone.scrcpy.autoWirelessIp
+                        ? Translation.tr("Connect wirelessly using the auto-detected IP")
+                        : Translation.tr("Prompt for IP:port and switch to wireless mode")
                 }
             }
 
@@ -444,7 +452,7 @@ ContentPage {
 
         StyledText {
             Layout.fillWidth: true
-            text: Translation.tr("1. Connect your phone via USB and allow ADB debugging.\n2. Enable TCP/IP mode.\n3. Disconnect USB and enter the phone's Wi-Fi IP below.")
+            text: Translation.tr("Auto-detect (recommended):\n1. On the phone, enable Developer options → Wireless debugging.\n2. Pair once with this PC if you never have.\n\nWith Auto-detect IP on, both the phone's address AND its wireless-debugging port — which Android randomises on every toggle/reboot — are discovered over the network (mDNS via avahi) on every launch. You never type either again.\n\nLegacy fallback: if your phone has no Wireless debugging, plug in USB, press \"Enable over USB\" (adb tcpip 5555), then unplug.")
             font.pixelSize: Appearance.font.pixelSize.small
             color: Appearance.colors.colSubtext
             wrapMode: Text.Wrap
@@ -534,8 +542,59 @@ ContentPage {
             onCheckedChanged: Config.options.phone.scrcpy.useWireless = checked
         }
 
+        ConfigSwitch {
+            visible: Config.options.phone.scrcpy.useWireless
+            buttonIcon: "sync_alt"
+            text: Translation.tr("Auto-detect IP (KDE Connect)")
+            checked: Config.options.phone.scrcpy.autoWirelessIp
+            onCheckedChanged: Config.options.phone.scrcpy.autoWirelessIp = checked
+        }
+
+        // Live readout of the target the next launch will use.
+        Rectangle {
+            Layout.fillWidth: true
+            Layout.preferredHeight: hostReadout.implicitHeight + 20
+            visible: Config.options.phone.scrcpy.useWireless
+                     && Config.options.phone.scrcpy.autoWirelessIp
+            radius: Appearance.rounding.small
+            color: KdeConnectService.resolvedWirelessHost !== ""
+                ? Appearance.colors.colPrimaryContainer
+                : Appearance.colors.colLayer2
+
+            RowLayout {
+                id: hostReadout
+                anchors.fill: parent
+                anchors.leftMargin: 12
+                anchors.rightMargin: 12
+                spacing: 8
+
+                MaterialSymbol {
+                    Layout.alignment: Qt.AlignVCenter
+                    text: KdeConnectService.resolvedWirelessHost !== "" ? "wifi_tethering" : "wifi_tethering_off"
+                    iconSize: 20
+                    color: KdeConnectService.resolvedWirelessHost !== ""
+                        ? Appearance.colors.colOnPrimaryContainer
+                        : Appearance.colors.colSubtext
+                }
+
+                StyledText {
+                    Layout.fillWidth: true
+                    text: KdeConnectService.resolvedWirelessHost !== ""
+                        ? Translation.tr("Will connect to %1").arg(KdeConnectService.resolvedWirelessHost)
+                        : Translation.tr("Waiting for KDE Connect to report the phone's IP…")
+                    font.pixelSize: Appearance.font.pixelSize.small
+                    font.weight: Font.DemiBold
+                    color: KdeConnectService.resolvedWirelessHost !== ""
+                        ? Appearance.colors.colOnPrimaryContainer
+                        : Appearance.colors.colSubtext
+                    wrapMode: Text.Wrap
+                }
+            }
+        }
+
         ConfigTextField {
             visible: Config.options.phone.scrcpy.useWireless
+                     && !Config.options.phone.scrcpy.autoWirelessIp
             text: Translation.tr("Phone IP")
             icon: "ip"
             placeholderText: "192.168.1.42"
@@ -547,6 +606,7 @@ ContentPage {
 
         ConfigSpinBox {
             visible: Config.options.phone.scrcpy.useWireless
+                     && !Config.options.phone.scrcpy.autoWirelessIp
             text: Translation.tr("Port")
             icon: "router"
             value: Config.options.phone.scrcpy.wirelessPort

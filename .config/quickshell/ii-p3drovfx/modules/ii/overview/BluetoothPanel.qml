@@ -312,7 +312,7 @@ Item {
         } else {
             root.isEnabling = false;
         }
-        adapter.enabled = !adapter.enabled;
+        BluetoothStatus.toggle();
     }
 
     function navigateUp() {
@@ -431,7 +431,7 @@ Item {
                     Layout.fillWidth: true
                     Layout.leftMargin: 12
                     Layout.rightMargin: 12
-                    Layout.topMargin: 8
+                    Layout.topMargin: 2
                     Layout.bottomMargin: 4
                     spacing: 6
 

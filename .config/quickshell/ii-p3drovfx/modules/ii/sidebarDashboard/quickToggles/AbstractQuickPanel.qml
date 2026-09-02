@@ -14,4 +14,9 @@ Rectangle {
     signal openWifiDialog
     signal openDarkModeDialog
     signal openLocalSendDialog
+    signal openVpnDialog
+    signal openTailscaleDialog
+    signal openDnsOverTlsDialog
+    signal openIdleInhibitorDialog
+    signal openScreenShaderDialog
 }

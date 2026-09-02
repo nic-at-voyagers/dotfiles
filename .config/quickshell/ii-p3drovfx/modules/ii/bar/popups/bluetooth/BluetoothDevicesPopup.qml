@@ -1,3 +1,4 @@
+import qs
 import qs.modules.ii.bar.shared
 import qs.modules.common
 import qs.modules.common.functions
@@ -9,6 +10,15 @@ import QtQuick.Layouts
 StyledPopup {
     id: root
     stickyHover: true
+    readonly property bool sidebarOccludesPopup:
+        (root.notifIsLeft && GlobalStates.effectiveLeftOpen)
+        || (root.notifIsRight && GlobalStates.effectiveRightOpen)
+
+    active: !sidebarOccludesPopup && (_computedActive || _isClosing)
+
+
+    readonly property bool notifIsLeft: (Config.options.notifications.position ?? "top_right").endsWith("left")
+    readonly property bool notifIsRight: (Config.options.notifications.position ?? "top_right").endsWith("right")
 
     readonly property bool hasDevices: BluetoothStatus.connectedDevices.length > 0
 
@@ -147,6 +157,28 @@ StyledPopup {
                                 iconContainerAnim.start();
                                 detailsColAnim.start();
                             });
+                        }
+                    }
+
+                    Connections {
+                        target: root
+                        function onPopupOpenProgressChanged() {
+                            if (root && root.popupOpenProgress === 0.0) {
+                                deviceCardAnim.stop();
+                                iconContainerAnim.stop();
+                                detailsColAnim.stop();
+
+                                deviceCard.opacity = 0.0;
+                                deviceCard.scale = 0.85;
+                                deviceCardTranslate.y = 25;
+
+                                iconContainer.scale = 0.8;
+                                iconContainer.opacity = 0.0;
+                                iconContainerTrans.x = -20;
+
+                                detailsCol.opacity = 0.0;
+                                detailsColTrans.x = 20;
+                            }
                         }
                     }
                     

@@ -4,16 +4,24 @@ import Quickshell
 import qs.services
 import qs.modules.common
 import qs.modules.common.widgets
+import qs.modules.settings.configs.widgets
 
 ContentPage {
     id: page
     forceWidth: false
 
+    readonly property bool videoWallpaper: {
+        const background = Config.options && Config.options.background ? Config.options.background : null;
+        if (!background)
+            return false;
+        return background.useWallpaperEngine === true || Wallpapers.isVideoFile(background.wallpaperPath || "");
+    }
+
     KeyboardShortcutBox {
         Layout.fillWidth: true
         Layout.bottomMargin: 8
         text: Translation.tr("Toggle the Overview screen")
-        keys: ["Super", "Tab"]
+        keys: ["Super"]
     }
 
     ContentSection {
@@ -63,20 +71,44 @@ ContentPage {
                     Config.options.overview.centerIcons = checked;
                 }
             }
-
         }
 
-        Item { Layout.preferredHeight: 16 }
+        Item {
+            Layout.preferredHeight: 16
+        }
 
         // Group 2: Behaviors
         ColumnLayout {
             Layout.fillWidth: true
             spacing: 4
 
-            ConfigSpinBox {
+            ConfigSwitch {
                 enabled: Config.options.overview.enable
+                buttonIcon: "tune"
+                text: Translation.tr("Manual Scale (Override Auto-Scale)")
+                checked: Config.options.overview.enableManualScale
+                onCheckedChanged: {
+                    Config.options.overview.enableManualScale = checked;
+                }
+            }
+
+            ConfigSpinBox {
+                enabled: Config.options.overview.enable && !Config.options.overview.enableManualScale
+                icon: "zoom_in_map"
+                text: Translation.tr("Auto-Scale Factor (%)")
+                value: (Config.options.overview.autoScaleFactor ?? 1.0) * 100
+                from: 50
+                to: 150
+                stepSize: 5
+                onValueChanged: {
+                    Config.options.overview.autoScaleFactor = value / 100;
+                }
+            }
+
+            ConfigSpinBox {
+                enabled: Config.options.overview.enable && Config.options.overview.enableManualScale
                 icon: "aspect_ratio"
-                text: Translation.tr("Scale %")
+                text: Translation.tr("Custom Scale (%)")
                 value: Config.options.overview.scale * 100
                 from: 10
                 to: 100
@@ -86,31 +118,56 @@ ContentPage {
                 }
             }
 
-            ConfigSwitch {
-                enabled: Config.options.overview.enable
-                buttonIcon: "animation"
-                text: Translation.tr("Enable zoom animation")
-                checked: Config.options.overview.showOpeningAnimation
-                onCheckedChanged: {
-                    Config.options.overview.showOpeningAnimation = checked;
+            ContentSubsection {
+                title: Translation.tr("Animation Style")
+                icon: "animation"
+                Layout.fillWidth: true
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: Appearance.rounding.verysmall
+
+                    ConfigSelectionArray {
+                        Layout.fillWidth: true
+                        Layout.minimumWidth: 0
+                        currentValue: Config.options.overview.animationStyle ?? "bounce"
+                        onSelected: newValue => {
+                            Config.options.overview.animationStyle = newValue;
+                        }
+                        options: [
+                            {
+                                displayName: Translation.tr("Slide + Bounce"),
+                                icon: "animation",
+                                value: "bounce"
+                            },
+                            {
+                                displayName: Translation.tr("Smooth Slide"),
+                                icon: "swipe",
+                                value: "smooth"
+                            },
+                            {
+                                displayName: Translation.tr("Zoom In"),
+                                icon: "zoom_in",
+                                value: "zoom"
+                            }
+                        ]
+                    }
+
+                    OverviewPreviewButton {
+                        Layout.alignment: Qt.AlignVCenter
+                        enabled: Config.options.overview.enable
+                        tooltipText: Translation.tr("Open the Overview to preview the animation in real time")
+                    }
                 }
             }
 
-            ContentSubsection {
-                visible: Config.options.overview.enable && Config.options.overview.showOpeningAnimation
-                title: Translation.tr("Zoom style")
-                icon: "zoom_in"
-                Layout.fillWidth: true
-
-                ConfigSelectionArray {
-                    currentValue: Config.options.overview.scrollingStyle.zoomStyle
-                    onSelected: newValue => {
-                        Config.options.overview.scrollingStyle.zoomStyle = newValue;
-                    }
-                    options: [
-                        { displayName: Translation.tr("In"), icon: "zoom_in", value: "in" },
-                        { displayName: Translation.tr("Out"), icon: "zoom_out", value: "out" }
-                    ]
+            ConfigSwitch {
+                enabled: Config.options.overview.enable
+                buttonIcon: "auto_awesome"
+                text: Translation.tr("Cascade Workspace Entrance")
+                checked: Config.options.overview.enableCascadeAnimation ?? true
+                onCheckedChanged: {
+                    Config.options.overview.enableCascadeAnimation = checked;
                 }
             }
         }
@@ -121,106 +178,231 @@ ContentPage {
         icon: "grid_view"
 
         ColumnLayout {
+            id: classicLayout
             Layout.fillWidth: true
-            spacing: 4
+            spacing: Appearance.rounding.small
 
-            ConfigSpinBox {
-                icon: "view_agenda"
-                text: Translation.tr("Rows")
-                value: Config.options.overview.rows
-                from: 1
-                to: 10
-                stepSize: 1
-                onValueChanged: {
-                    Config.options.overview.rows = value;
-                }
-            }
-
-            ConfigSpinBox {
-                icon: "view_column"
-                text: Translation.tr("Columns")
-                value: Config.options.overview.columns
-                from: 1
-                to: 10
-                stepSize: 1
-                onValueChanged: {
-                    Config.options.overview.columns = value;
-                }
-            }
-
-            ContentSubsection {
-                title: Translation.tr("Horizontal direction")
-                icon: "swap_horiz"
+            GridLayout {
+                id: classicControls
                 Layout.fillWidth: true
+                columns: width >= Appearance.font.pixelSize.hugeass * 32 ? 2 : 1
+                columnSpacing: Appearance.rounding.verysmall
+                rowSpacing: Appearance.rounding.verysmall
 
-                ConfigSelectionArray {
-                    currentValue: Config.options.overview.orderRightLeft
-                    onSelected: newValue => {
-                        Config.options.overview.orderRightLeft = newValue;
+                ConfigSpinBox {
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    icon: "view_agenda"
+                    text: Translation.tr("Rows")
+                    value: Config.options.overview.rows
+                    from: 1
+                    to: 10
+                    stepSize: 1
+                    topLeftRadius: Appearance.rounding.large
+                    topRightRadius: Appearance.rounding.verysmall
+                    bottomLeftRadius: Appearance.rounding.verysmall
+                    bottomRightRadius: Appearance.rounding.verysmall
+                    onValueChanged: {
+                        Config.options.overview.rows = value;
                     }
-                    options: [
-                        { displayName: Translation.tr("Left to right"), icon: "arrow_forward", value: false },
-                        { displayName: Translation.tr("Right to left"), icon: "arrow_back", value: true }
-                    ]
+                }
+
+                ConfigSpinBox {
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    icon: "view_column"
+                    text: Translation.tr("Columns")
+                    value: Config.options.overview.columns
+                    from: 1
+                    to: 10
+                    stepSize: 1
+                    topLeftRadius: Appearance.rounding.verysmall
+                    topRightRadius: Appearance.rounding.large
+                    bottomLeftRadius: Appearance.rounding.verysmall
+                    bottomRightRadius: Appearance.rounding.verysmall
+                    onValueChanged: {
+                        Config.options.overview.columns = value;
+                    }
+                }
+
+                ContentSubsection {
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    title: Translation.tr("Horizontal direction")
+                    icon: "swap_horiz"
+                    topLeftRadius: Appearance.rounding.verysmall
+                    topRightRadius: Appearance.rounding.verysmall
+                    bottomLeftRadius: Appearance.rounding.large
+                    bottomRightRadius: Appearance.rounding.verysmall
+
+                    ConfigSelectionArray {
+                        Layout.fillWidth: true
+                        Layout.minimumWidth: 0
+                        currentValue: Config.options.overview.orderRightLeft
+                        onSelected: newValue => {
+                            Config.options.overview.orderRightLeft = newValue;
+                        }
+                        options: [
+                            {
+                                displayName: Translation.tr("Left to right"),
+                                icon: "arrow_forward",
+                                value: false
+                            },
+                            {
+                                displayName: Translation.tr("Right to left"),
+                                icon: "arrow_back",
+                                value: true
+                            }
+                        ]
+                    }
+                }
+
+                ContentSubsection {
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    title: Translation.tr("Vertical direction")
+                    icon: "swap_vert"
+                    topLeftRadius: Appearance.rounding.verysmall
+                    topRightRadius: Appearance.rounding.verysmall
+                    bottomLeftRadius: Appearance.rounding.verysmall
+                    bottomRightRadius: Appearance.rounding.large
+
+                    ConfigSelectionArray {
+                        Layout.fillWidth: true
+                        Layout.minimumWidth: 0
+                        currentValue: Config.options.overview.orderBottomUp
+                        onSelected: newValue => {
+                            Config.options.overview.orderBottomUp = newValue;
+                        }
+                        options: [
+                            {
+                                displayName: Translation.tr("Top-down"),
+                                icon: "arrow_downward",
+                                value: false
+                            },
+                            {
+                                displayName: Translation.tr("Bottom-up"),
+                                icon: "arrow_upward",
+                                value: true
+                            }
+                        ]
+                    }
                 }
             }
 
-            ContentSubsection {
-                title: Translation.tr("Vertical direction")
-                icon: "swap_vert"
+            OverviewGridPreview {
+                id: overviewPreview
                 Layout.fillWidth: true
-
-                ConfigSelectionArray {
-                    currentValue: Config.options.overview.orderBottomUp
-                    onSelected: newValue => {
-                        Config.options.overview.orderBottomUp = newValue;
-                    }
-                    options: [
-                        { displayName: Translation.tr("Top-down"), icon: "arrow_downward", value: false },
-                        { displayName: Translation.tr("Bottom-up"), icon: "arrow_upward", value: true }
-                    ]
-                }
+                rows: Config.options.overview.rows
+                columns: Config.options.overview.columns
+                rightToLeft: Config.options.overview.orderRightLeft
+                bottomUp: Config.options.overview.orderBottomUp
+                autoScaleFactor: Config.options.overview.autoScaleFactor ?? 1.0
             }
         }
     }
 
     ContentSection {
-        title: Translation.tr("Background Style")
-        icon: "wallpaper"
+        title: Translation.tr("Zoom animation")
+        icon: "zoom_in_map"
 
-        ColumnLayout {
+        NoticeBox {
             Layout.fillWidth: true
-            spacing: 4
+            visible: page.videoWallpaper
+            materialIcon: "movie"
+            text: Translation.tr("Video wallpaper is active: only the default zoom style is available.")
+        }
 
-            ContentSubsection {
-                title: Translation.tr("Background style")
-                icon: "style"
+        ConfigSwitch {
+            buttonIcon: "zoom_in_map"
+            text: Translation.tr("Zoom animation when overview/cheatsheet is open (Experimental)")
+            checked: Config.options.background.zoomOutEnabled
+            onCheckedChanged: Config.options.background.zoomOutEnabled = checked
+            StyledToolTip {
+                text: Translation.tr("Scale windows with the wallpaper when Overview or the Cheat Sheet opens.")
+            }
+        }
+
+        ContentSubsection {
+            visible: Config.options.background.zoomOutEnabled || page.videoWallpaper
+            title: Translation.tr("Zoom background style")
+            icon: "style"
+            Layout.fillWidth: true
+
+            RowLayout {
                 Layout.fillWidth: true
+                spacing: Appearance.rounding.verysmall
 
                 ConfigSelectionArray {
-                    currentValue: Config.options.overview.scrollingStyle.backgroundStyle
-                    onSelected: newValue => {
-                        Config.options.overview.scrollingStyle.backgroundStyle = newValue;
-                    }
+                    Layout.fillWidth: true
+                    Layout.minimumWidth: 0
+                    currentValue: Config.options.background.zoomOutStyle
+                    onSelected: newValue => Config.options.background.zoomOutStyle = newValue
                     options: [
-                        { displayName: Translation.tr("Blur"), icon: "blur_on", value: "blur" },
-                        { displayName: Translation.tr("Dim"), icon: "brightness_medium", value: "dim" },
-                        { displayName: Translation.tr("Transparent"), icon: "visibility_off", value: "transparent" }
+                        {
+                            displayName: Translation.tr("Gnome Like"),
+                            icon: "blur_on",
+                            enabled: !page.videoWallpaper,
+                            value: 0
+                        },
+                        {
+                            displayName: Translation.tr("Default"),
+                            icon: "grid_view",
+                            value: 1
+                        },
+                        {
+                            displayName: Translation.tr("Zoom In"),
+                            icon: "zoom_in",
+                            enabled: !page.videoWallpaper,
+                            value: 2
+                        }
                     ]
                 }
-            }
 
-            ConfigSpinBox {
-                enabled: Config.options.overview.scrollingStyle.backgroundStyle === "dim"
-                icon: "contrast"
-                text: Translation.tr("Dim percentage")
-                value: Config.options.overview.scrollingStyle.dimPercentage
-                from: 0
-                to: 100
-                stepSize: 5
-                onValueChanged: {
-                    Config.options.overview.scrollingStyle.dimPercentage = value;
+                OverviewPreviewButton {
+                    Layout.alignment: Qt.AlignVCenter
+                    enabled: Config.options.background.zoomOutEnabled && (!page.videoWallpaper || Config.options.background.zoomOutStyle === 1)
+                    tooltipText: !Config.options.background.zoomOutEnabled ? Translation.tr("Enable Zoom animation to preview this style.") : Translation.tr("Open the Overview to preview the selected zoom style")
                 }
+            }
+        }
+
+        ConfigSwitch {
+            visible: (Config.options.background.zoomOutEnabled && Config.options.background.zoomOutStyle === 0) || page.videoWallpaper
+            enabled: !page.videoWallpaper
+            buttonIcon: "open_with"
+            text: Translation.tr("Scale windows with wallpaper (Experimental)")
+            checked: Config.options.background.windowZoomOnOverview
+            onCheckedChanged: Config.options.background.windowZoomOnOverview = checked
+            StyledToolTip {
+                text: Translation.tr("Show scaled window previews zooming out with the wallpaper when the overview opens.")
+            }
+        }
+
+        ConfigSwitch {
+            visible: (Config.options.background.zoomOutEnabled && Config.options.background.zoomOutStyle === 0 && Config.options.background.windowZoomOnOverview) || page.videoWallpaper
+            enabled: !page.videoWallpaper
+            buttonIcon: "videocam"
+            text: Translation.tr("Keep screencopy live (no freeze)")
+            checked: Config.options.background.windowZoomLiveCapture
+            onCheckedChanged: Config.options.background.windowZoomLiveCapture = checked
+            StyledToolTip {
+                text: Translation.tr("Keep window previews live instead of freezing them when the overview opens.")
+            }
+        }
+    }
+
+    ContentSection {
+        icon: "link"
+        title: Translation.tr("Related settings")
+
+        Flow {
+            Layout.fillWidth: true
+            spacing: 8
+
+            RelatedChip {
+                pageId: "workspaces"
+                label: Translation.tr("Workspaces")
             }
         }
     }

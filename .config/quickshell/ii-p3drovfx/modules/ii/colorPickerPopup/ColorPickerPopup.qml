@@ -12,6 +12,12 @@ import Quickshell.Hyprland
 Scope {
     id: root
 
+    readonly property bool notifIsLeft: (Config.options.notifications.position ?? "top_right").endsWith("left")
+    readonly property bool notifIsRight: (Config.options.notifications.position ?? "top_right").endsWith("right")
+    readonly property bool sidebarOccludesPopup:
+        (root.notifIsLeft && GlobalStates.effectiveLeftOpen)
+        || (root.notifIsRight && GlobalStates.effectiveRightOpen)
+
     // Native Process avoids qs ipc call round-trip from external shell
     Process {
         id: hyprpickerProcess
@@ -48,27 +54,31 @@ Scope {
     }
 
     Connections {
-        target: GlobalStates
-        function onDashboardPanelOpenChanged() {
-            if (GlobalStates.dashboardPanelOpen) {
+        target: Config.options.bar.tooltips
+        function onEnablePopupsChanged() {
+            if (!Config.options.bar.tooltips.enablePopups)
                 GlobalStates.colorPickerPopupOpen = false;
-            }
         }
-        function onPoliciesPanelOpenChanged() {
-            if (GlobalStates.policiesPanelOpen) {
+        function onEnableColorPickerPopupChanged() {
+            if (!Config.options.bar.tooltips.enableColorPickerPopup)
                 GlobalStates.colorPickerPopupOpen = false;
-            }
         }
     }
+
 
     LazyLoader {
         id: popupLoader
         active: GlobalStates.colorPickerPopupOpen
+            && Config.options.bar.tooltips.enablePopups
+            && Config.options.bar.tooltips.enableColorPickerPopup
 
         component: PanelWindow {
             id: popupWindow
             color: "transparent"
-            visible: Quickshell.screens.length > 0 && true
+            visible: Quickshell.screens.length > 0
+                && Config.options.bar.tooltips.enablePopups
+                && Config.options.bar.tooltips.enableColorPickerPopup
+                && !root.sidebarOccludesPopup
             screen: Quickshell.screens.find(s => s.name === Hyprland.focusedMonitor?.name) ?? Quickshell.screens[0] ?? null
 
             WlrLayershell.namespace: "quickshell:colorPickerPopup"
@@ -79,8 +89,8 @@ Scope {
             anchors {
                 top: Config.options.bar.vertical || (!Config.options.bar.vertical && !Config.options.bar.bottom)
                 bottom: !Config.options.bar.vertical && Config.options.bar.bottom
-                left: Config.options.bar.vertical && !Config.options.bar.bottom
-                right: (!Config.options.bar.vertical) || (Config.options.bar.vertical && Config.options.bar.bottom)
+                left: Config.options.bar.vertical ? (Config.options.bar.bottom ? false : true) : root.notifIsRight
+                right: Config.options.bar.vertical ? (Config.options.bar.bottom ? true : false) : root.notifIsLeft
             }
 
             readonly property int frameThickness: Config.options.appearance.fakeScreenRounding === 3 ? Config.options.appearance.wrappedFrameThickness : 0
@@ -107,13 +117,19 @@ Scope {
                     if (Config.options.bar.vertical) {
                         return Config.options.bar.bottom ? leftFrameThickness : Appearance.sizes.verticalBarWindowWidth + leftFrameThickness;
                     }
+                    if (root.notifIsRight) {
+                        return barGaps + 4 + leftFrameThickness;
+                    }
                     return leftFrameThickness;
                 }
                 right: {
                     if (Config.options.bar.vertical) {
                         return Config.options.bar.bottom ? Appearance.sizes.verticalBarWindowWidth + rightFrameThickness : rightFrameThickness;
                     }
-                    return barGaps + 4 + rightFrameThickness;
+                    if (root.notifIsLeft) {
+                        return barGaps + 4 + rightFrameThickness;
+                    }
+                    return rightFrameThickness;
                 }
             }
 

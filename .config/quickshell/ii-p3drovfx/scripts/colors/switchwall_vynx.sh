@@ -24,8 +24,11 @@ handle_kde_material_you_colors() {
     # Map $type_flag to allowed scheme variants for kde-material-you-colors-wrapper.sh
     local kde_scheme_variant=""
     case "$type_flag" in
-        scheme-content|scheme-expressive|scheme-fidelity|scheme-fruit-salad|scheme-monochrome|scheme-neutral|scheme-rainbow|scheme-tonal-spot)
+        scheme-content|scheme-expressive|scheme-fidelity|scheme-fruit-salad|scheme-monochrome|scheme-neutral|scheme-rainbow|scheme-tonal-spot|scheme-vibrant)
             kde_scheme_variant="$type_flag"
+            ;;
+        scheme-intense)
+            kde_scheme_variant="scheme-fidelity"
             ;;
         *)
             kde_scheme_variant="scheme-tonal-spot" # default
@@ -107,7 +110,7 @@ CUSTOM_DIR="$XDG_CONFIG_HOME/hypr/custom"
 RESTORE_SCRIPT_DIR="$CUSTOM_DIR/scripts"
 RESTORE_SCRIPT="$RESTORE_SCRIPT_DIR/__restore_video_wallpaper.sh"
 THUMBNAIL_DIR="$RESTORE_SCRIPT_DIR/mpvpaper_thumbnails"
-VIDEO_OPTS="no-audio loop hwdec=auto scale=bilinear interpolation=no video-sync=display-resample panscan=1.0 video-scale-x=1.0 video-scale-y=1.0 video-align-x=0.5 video-align-y=0.5 load-scripts=no"
+VIDEO_OPTS="no-audio loop hwdec=auto scale=bilinear interpolation=no video-sync=display-resample panscan=1.0 video-zoom=0.08 load-scripts=no"
 
 is_video() {
     local extension="${1##*.}"
@@ -115,7 +118,8 @@ is_video() {
 }
 
 kill_existing_mpvpaper() {
-    pkill -f -9 mpvpaper || true
+    pkill -9 -f mpvpaper || true
+    sleep 0.2
 }
 
 kill_existing_wpe() {
@@ -161,7 +165,7 @@ create_restore_script() {
 pkill -f -9 mpvpaper
 
 for monitor in \$(hyprctl monitors -j | jq -r '.[] | .name'); do
-    mpvpaper -o "$VIDEO_OPTS" "\$monitor" "$video_path" &
+    mpvpaper -o "$VIDEO_OPTS input-ipc-server=/tmp/mpvpaper-\$monitor.sock" "\$monitor" "$video_path" &
     sleep 0.1
 done
 EOF
@@ -179,8 +183,15 @@ EOF
 
 set_wallpaper_path() {
     local path="$1"
+    local target="$2"
     if [ -f "$SHELL_CONFIG_FILE" ]; then
-        jq --indent 4 --arg path "$path" '.background.wallpaperPath = $path' "$SHELL_CONFIG_FILE" > "$SHELL_CONFIG_FILE.tmp" && mv "$SHELL_CONFIG_FILE.tmp" "$SHELL_CONFIG_FILE"
+        if [[ "$target" == "lightmode" ]]; then
+            jq --indent 4 --arg path "$path" '.background.lightModeWallpaperPath = $path' "$SHELL_CONFIG_FILE" > "$SHELL_CONFIG_FILE.tmp" && mv "$SHELL_CONFIG_FILE.tmp" "$SHELL_CONFIG_FILE"
+        elif [[ "$target" == "lockscreen" ]]; then
+            jq --indent 4 --arg path "$path" '.background.lockscreenWallpaperPath = $path' "$SHELL_CONFIG_FILE" > "$SHELL_CONFIG_FILE.tmp" && mv "$SHELL_CONFIG_FILE.tmp" "$SHELL_CONFIG_FILE"
+        else
+            jq --indent 4 --arg path "$path" '.background.wallpaperPath = $path' "$SHELL_CONFIG_FILE" > "$SHELL_CONFIG_FILE.tmp" && mv "$SHELL_CONFIG_FILE.tmp" "$SHELL_CONFIG_FILE"
+        fi
     fi
 }
 
@@ -204,6 +215,40 @@ switch() {
     color_flag="$4"
     color="$5"
     theme_file="$6"
+
+    # Guard against rapid wallpaper switches racing each other: the all-previews
+    # generation below takes over a second, so a second switch launched before it
+    # finishes must not have its result overwritten by the older, slower run.
+    # request_seq_flag (--request-seq) comes from the QML caller and is strictly
+    # increasing in click order, since QML dispatch is single-threaded. Direct
+    # callers without a sequence receive the next token under the same lock, so
+    # they cannot be rejected just because an older QML token uses timestamps.
+    request_token_file="$STATE_DIR/user/generated/.preview_request_token"
+    mkdir -p "$(dirname "$request_token_file")"
+    if [[ -n "$request_seq_flag" ]]; then
+        my_request_token="$request_seq_flag"
+        (
+            flock -x 201
+            current_seq=$(cat "$request_token_file" 2>/dev/null)
+            if [[ -z "$current_seq" ]] || ! [[ "$current_seq" =~ ^[0-9]+$ ]] || (( my_request_token > current_seq )); then
+                printf '%s' "$my_request_token" > "$request_token_file"
+            fi
+        ) 201>"$request_token_file.lock"
+    else
+        my_request_token=$(
+            (
+                flock -x 201
+                current_seq=$(cat "$request_token_file" 2>/dev/null)
+                if [[ "$current_seq" =~ ^[0-9]+$ ]]; then
+                    next_seq=$((current_seq + 1))
+                else
+                    next_seq=$(date +%s%3N)
+                fi
+                printf '%s' "$next_seq" > "$request_token_file"
+                printf '%s' "$next_seq"
+            ) 201>"$request_token_file.lock"
+        )
+    fi
 
     # Start Gemini auto-categorization if enabled
     aiStylingEnabled=$(jq -r '.background.widgets.clock.cookie.aiStyling' "$SHELL_CONFIG_FILE")
@@ -252,15 +297,39 @@ switch() {
         fi
 
         if [[ $is_wpe -eq 1 ]]; then
-            # Try to resolve workshop directory from assets directory if it's a numeric ID
-            if [[ "$imgpath" =~ ^[0-9]+$ && -n "$wpe_assets" ]]; then
-                wpe_workshop="${wpe_assets/common\/wallpaper_engine\/assets/workshop\/content\/431960}"
-                if [[ ! -d "$wpe_workshop" ]]; then
-                    wpe_workshop="${wpe_assets/common\/wallpaper_engine/workshop\/content\/431960}"
+            # Auto-detect wpe_assets if empty or invalid
+            if [[ -z "$wpe_assets" || ! -d "$wpe_assets" ]]; then
+                for candidate_assets in \
+                    "/mnt/01DA34356F1F3C40/SteamLibrary/steamapps/common/wallpaper_engine/assets" \
+                    "$HOME/.local/share/Steam/steamapps/common/wallpaper_engine/assets" \
+                    "$HOME/.steam/steam/steamapps/common/wallpaper_engine/assets" \
+                    "$HOME/.steam/root/steamapps/common/wallpaper_engine/assets"; do
+                    if [[ -d "$candidate_assets" ]]; then
+                        wpe_assets="$candidate_assets"
+                        break
+                    fi
+                done
+            fi
+
+            # Try to resolve workshop directory from assets directory or candidate paths if it's a numeric ID
+            if [[ "$imgpath" =~ ^[0-9]+$ ]]; then
+                local wpe_candidates=()
+                if [[ -n "$wpe_assets" ]]; then
+                    wpe_candidates+=("${wpe_assets/common\/wallpaper_engine\/assets/workshop\/content\/431960}")
+                    wpe_candidates+=("${wpe_assets/common\/wallpaper_engine/workshop\/content\/431960}")
                 fi
-                if [[ -d "$wpe_workshop/$imgpath" ]]; then
-                    imgpath="$wpe_workshop/$imgpath"
-                fi
+                wpe_candidates+=(
+                    "/mnt/01DA34356F1F3C40/SteamLibrary/steamapps/workshop/content/431960"
+                    "$HOME/.local/share/Steam/steamapps/workshop/content/431960"
+                    "$HOME/.steam/steam/steamapps/workshop/content/431960"
+                    "$HOME/.steam/root/steamapps/workshop/content/431960"
+                )
+                for cand in "${wpe_candidates[@]}"; do
+                    if [[ -d "$cand/$imgpath" ]]; then
+                        imgpath="$cand/$imgpath"
+                        break
+                    fi
+                done
             fi
             enable_wpe_config
 
@@ -310,7 +379,7 @@ switch() {
                 wpe_nofullscreenpause=$(jq -r '.background.wpeNoFullscreenPause' "$SHELL_CONFIG_FILE" 2>/dev/null || echo "false")
 
                 # Determine assets directory and build restore options array
-                local wpe_restore_opts=()
+                local wpe_restore_opts=(--layer background)
                 if [[ -n "$wpe_assets" && -d "$wpe_assets" ]]; then
                     wpe_restore_opts+=(--assets-dir "$wpe_assets")
                 fi
@@ -476,13 +545,25 @@ done"
             fi
 
             # Set wallpaper path
-            set_wallpaper_path "$imgpath"
+            if [[ -z "$colors_only_flag" && -z "$noswitch_flag" ]]; then
+                if [[ -n "$lightmode_flag" ]]; then
+                    set_wallpaper_path "$imgpath" "lightmode"
+                elif [[ -n "$lockscreen_flag" ]]; then
+                    set_wallpaper_path "$imgpath" "lockscreen"
+                else
+                    set_wallpaper_path "$imgpath" "desktop"
+                fi
+            fi
 
             # Set video wallpaper
             local video_path="$imgpath"
+            if [[ -f "${imgpath%.*}_1080p.mp4" ]]; then
+                video_path="${imgpath%.*}_1080p.mp4"
+            fi
+            kill_existing_mpvpaper
             monitors=$(hyprctl monitors -j | jq -r '.[] | .name')
             for monitor in $monitors; do
-                nohup mpvpaper -o "$VIDEO_OPTS" "$monitor" "$video_path" >/dev/null 2>&1 &
+                nohup setsid mpvpaper -o "$VIDEO_OPTS input-ipc-server=/tmp/mpvpaper-$monitor.sock" "$monitor" "$video_path" >/dev/null 2>&1 &
                 sleep 0.1
             done
 
@@ -503,10 +584,19 @@ done"
                 exit 1
             fi
         else
+            kill_existing_mpvpaper
             matugen_args+=(image "$imgpath")
             generate_colors_material_args=(--path "$imgpath")
             # Update wallpaper path in config
-            set_wallpaper_path "$imgpath"
+            if [[ -z "$colors_only_flag" && -z "$noswitch_flag" ]]; then
+                if [[ -n "$lightmode_flag" ]]; then
+                    set_wallpaper_path "$imgpath" "lightmode"
+                elif [[ -n "$lockscreen_flag" ]]; then
+                    set_wallpaper_path "$imgpath" "lockscreen"
+                else
+                    set_wallpaper_path "$imgpath" "desktop"
+                fi
+            fi
             remove_restore
         fi
     fi
@@ -531,7 +621,13 @@ done"
             generate_colors_material_args+=(--mode "$mode_flag")
         fi
     fi
-    [[ -n "$type_flag" ]] && matugen_args+=(--type "$type_flag") && generate_colors_material_args+=(--scheme "$type_flag")
+    if [[ "$type_flag" == "scheme-intense" ]]; then
+        matugen_args+=(--type "scheme-fidelity")
+    elif [[ -n "$type_flag" ]]; then
+        matugen_args+=(--type "$type_flag")
+    fi
+    matugen_args+=(--source-color-index 0)
+    generate_colors_material_args+=(--scheme "$type_flag")
     generate_colors_material_args+=(--termscheme "$terminalscheme" --blend_bg_fg)
     generate_colors_material_args+=(--cache "$STATE_DIR/user/generated/color.txt")
 
@@ -564,19 +660,31 @@ done"
         "$SCRIPT_DIR"/applycolor_vynx.sh
     else
         matugen "${matugen_args[@]}"
-        python3 "$HOME/.config/quickshell/ii/scripts/colors/recolor_icons.py"
-        source "$(eval echo $ILLOGICAL_IMPULSE_VIRTUAL_ENV)/bin/activate"
-        python3 "$SCRIPT_DIR/generate_colors_material_vynx.py" "${generate_colors_material_args[@]}" \
-            > "$STATE_DIR"/user/generated/material_colors.scss.tmp && \
-            mv "$STATE_DIR"/user/generated/material_colors.scss.tmp "$STATE_DIR"/user/generated/material_colors.scss
-        deactivate
-        "$SCRIPT_DIR"/applycolor_vynx.sh
+        if [[ "$type_flag" == "scheme-intense" ]]; then
+            echo "[switchwall_vynx.sh] Applying intense surface boost to colors.json (mode: $mode_flag)" >&2
+            python3 "$SCRIPT_DIR/boost_surface_chroma.py" "$STATE_DIR/user/generated/colors.json" --mode "$mode_flag"
+        fi
+        (
+            python3 "$HOME/.config/quickshell/ii/scripts/colors/recolor_icons.py" &
+            (
+                source "$(eval echo $ILLOGICAL_IMPULSE_VIRTUAL_ENV)/bin/activate"
+                if python3 "$SCRIPT_DIR/generate_colors_material_vynx.py" "${generate_colors_material_args[@]}" \
+                    --all-previews "$STATE_DIR/user/generated/wallpaper_preview_colors.json" \
+                    --request-token "$request_token_file" --request-value "$my_request_token" \
+                    > "$STATE_DIR"/user/generated/material_colors.scss.tmp; then
+                    mv "$STATE_DIR"/user/generated/material_colors.scss.tmp "$STATE_DIR"/user/generated/material_colors.scss
+                else
+                    rm -f "$STATE_DIR"/user/generated/material_colors.scss.tmp
+                    echo "[switchwall_vynx.sh] Color generation skipped; preserving the previous terminal palette." >&2
+                fi
+                deactivate
+                "$SCRIPT_DIR"/applycolor_vynx.sh
+            ) &
+        ) & disown
     fi
 
     # Pass screen width, height, and wallpaper path to post_process
-    max_width_desired="$(hyprctl monitors -j | jq '([.[].width] | min)' | xargs)"
-    max_height_desired="$(hyprctl monitors -j | jq '([.[].height] | min)' | xargs)"
-    post_process "$max_width_desired" "$max_height_desired" "$imgpath"
+    post_process "1920" "1080" "$imgpath"
 }
 
 main() {
@@ -605,6 +713,10 @@ main() {
         deactivate
     }
 
+    lockscreen_flag=""
+    colors_only_flag=""
+    lightmode_flag=""
+
     while [[ $# -gt 0 ]]; do
         case "$1" in
             --mode)
@@ -614,6 +726,18 @@ main() {
             --type)
                 type_flag="$2"
                 shift 2
+                ;;
+            --lockscreen)
+                lockscreen_flag="1"
+                shift
+                ;;
+            --lightmode)
+                lightmode_flag="1"
+                shift
+                ;;
+            --colors-only)
+                colors_only_flag="1"
+                shift
                 ;;
             --color)
                 if [[ "$2" =~ ^#?[A-Fa-f0-9]{6}$ ]]; then
@@ -631,13 +755,19 @@ main() {
                 imgpath="$2"
                 shift 2
                 ;;
+            --request-seq)
+                request_seq_flag="$2"
+                shift 2
+                ;;
             --noswitch)
                 noswitch_flag="1"
-                use_wpe=$(jq -r '.background.useWallpaperEngine' "$SHELL_CONFIG_FILE" 2>/dev/null || echo "false")
-                if [[ "$use_wpe" == "true" ]]; then
-                    imgpath=$(jq -r '.background.wallpaperEngineId' "$SHELL_CONFIG_FILE" 2>/dev/null || echo "")
-                else
-                    imgpath=$(jq -r '.background.wallpaperPath' "$SHELL_CONFIG_FILE" 2>/dev/null || echo "")
+                if [[ -z "$imgpath" ]]; then
+                    use_wpe=$(jq -r '.background.useWallpaperEngine' "$SHELL_CONFIG_FILE" 2>/dev/null || echo "false")
+                    if [[ "$use_wpe" == "true" ]]; then
+                        imgpath=$(jq -r '.background.wallpaperEngineId' "$SHELL_CONFIG_FILE" 2>/dev/null || echo "")
+                    else
+                        imgpath=$(jq -r '.background.wallpaperPath' "$SHELL_CONFIG_FILE" 2>/dev/null || echo "")
+                    fi
                 fi
                 shift
                 ;;
@@ -663,7 +793,7 @@ main() {
     fi
 
     # Validate type_flag (allow 'auto' as well)
-    allowed_types=(scheme-content scheme-expressive scheme-fidelity scheme-fruit-salad scheme-monochrome scheme-neutral scheme-rainbow scheme-tonal-spot auto)
+    allowed_types=(scheme-content scheme-expressive scheme-fidelity scheme-fruit-salad scheme-monochrome scheme-neutral scheme-rainbow scheme-tonal-spot scheme-vibrant scheme-intense auto)
     valid_type=0
     for t in "${allowed_types[@]}"; do
         if [[ "$type_flag" == "$t" ]]; then
@@ -693,6 +823,38 @@ main() {
     if [[ -z "$imgpath" && -z "$color_flag" && -z "$noswitch_flag" ]]; then
         cd "$(xdg-user-dir PICTURES)/Wallpapers/showcase" 2>/dev/null || cd "$(xdg-user-dir PICTURES)/Wallpapers" 2>/dev/null || cd "$(xdg-user-dir PICTURES)" || return 1
         imgpath="$(kdialog --getopenfilename . --title 'Choose wallpaper')"
+    fi
+
+    # Fallback to default wallpaper if empty
+    if [[ -z "$imgpath" || "$imgpath" == "null" ]]; then
+        imgpath="$CONFIG_DIR/assets/images/default_wallpaper.png"
+    fi
+
+    # If --lockscreen is passed and --noswitch is passed (or selecting lockscreen wall):
+    # Only save to config without running matugen or changing theme colors
+    if [[ -n "$lockscreen_flag" && -n "$noswitch_flag" ]]; then
+        set_wallpaper_path "$imgpath" "lockscreen"
+        echo "[switchwall_vynx.sh] Saved lockscreen wallpaper path."
+        exit 0
+    fi
+
+    # If --lightmode is passed and --noswitch is passed:
+    # Only save to config without running matugen or changing theme colors
+    if [[ -n "$lightmode_flag" && -n "$noswitch_flag" ]]; then
+        set_wallpaper_path "$imgpath" "lightmode"
+        echo "[switchwall_vynx.sh] Saved light mode wallpaper path."
+        exit 0
+    fi
+
+    # Update config wallpaper path unless colors_only_flag or noswitch_flag is set
+    if [[ -z "$colors_only_flag" && -z "$noswitch_flag" ]]; then
+        if [[ -n "$lightmode_flag" ]]; then
+            set_wallpaper_path "$imgpath" "lightmode"
+        elif [[ -n "$lockscreen_flag" ]]; then
+            set_wallpaper_path "$imgpath" "lockscreen"
+        else
+            set_wallpaper_path "$imgpath" "desktop"
+        fi
     fi
 
     if [[ -n "$imgpath" && -z "$noswitch_flag" ]]; then
@@ -727,6 +889,20 @@ main() {
             fi
         else
             echo "[switchwall] Warning: No image to auto-detect scheme from, defaulting to 'scheme-tonal-spot'" >&2
+            type_flag="scheme-tonal-spot"
+        fi
+    fi
+
+    # Resolve light theme variant when mode is light
+    if [[ -n "$theme_file" && "$mode_flag" == "light" ]]; then
+        local light_theme_file="${theme_file%.json}_light.json"
+        if [[ -f "$light_theme_file" ]]; then
+            theme_file="$light_theme_file"
+            echo "[switchwall_vynx.sh] Using light theme variant: $type_flag"
+        else
+            echo "[switchwall_vynx.sh] No light variant for '$type_flag', falling back to matugen generation"
+            theme_file=""
+            # Must be a valid matugen scheme (not "auto" — matugen rejects it)
             type_flag="scheme-tonal-spot"
         fi
     fi

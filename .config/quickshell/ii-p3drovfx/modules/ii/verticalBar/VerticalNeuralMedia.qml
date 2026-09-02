@@ -36,10 +36,21 @@ MouseArea {
         return artDownloaded ? Qt.resolvedUrl(artFilePath) : artUrl;
     }
 
-    implicitWidth: Appearance.sizes.verticalBarWidth
-    implicitHeight: pillHeight
-    width: implicitWidth
-    height: implicitHeight
+    onHasTrackChanged: {
+        if (typeof rootItem !== "undefined") {
+            rootItem.toggleVisible(hasTrack);
+        }
+    }
+
+    Component.onCompleted: {
+        if (typeof rootItem !== "undefined") {
+            rootItem.toggleVisible(hasTrack);
+        }
+    }
+
+    implicitWidth: hasTrack ? (Appearance.sizes.verticalBarWidth - 8) : 0
+    implicitHeight: hasTrack ? pillHeight : 0
+    Layout.fillHeight: true
     visible: hasTrack
 
     cursorShape: Qt.PointingHandCursor
@@ -71,6 +82,15 @@ MouseArea {
             }
         }
     }
+    onWheel: event => {
+        if (!Config.options.bar.mediaPlayer.enableVolumeScroll)
+            return;
+        if (event.angleDelta.y > 0)
+            MprisController.incrementVolume();
+        else if (event.angleDelta.y < 0)
+            MprisController.decrementVolume();
+        event.accepted = true;
+    }
 
     onArtFilePathChanged: {
         if (!artUrl || artUrl.length === 0) {
@@ -101,7 +121,7 @@ MouseArea {
         onTriggered: activePlayer.positionChanged()
     }
 
-    property var visualizerPoints: []
+    property var visualizerPoints: CavaService.visualizerPoints
 
     readonly property real bar0Val: visualizerPoints.length > 5 ? visualizerPoints[3] / 1000.0 : 0
     readonly property real bar1Val: visualizerPoints.length > 11 ? visualizerPoints[9] / 1000.0 : 0
@@ -126,23 +146,9 @@ MouseArea {
         return minW + norm * (maxBarLength - minW);
     }
 
-    Process {
-        id: cavaProc
-        running: root.playing
-        command: ["cava", "-p", `${FileUtils.trimFileProtocol(Directories.scriptPath)}/cava/raw_output_config.txt`]
-        stdout: SplitParser {
-            onRead: data => {
-                let points = data.split(";").map(p => parseFloat(p.trim())).filter(p => !isNaN(p));
-                root.visualizerPoints = points;
-            }
-        }
-    }
-
     Rectangle {
         id: pillContainer
-        anchors.centerIn: parent
-        width: root.pillWidth
-        height: root.pillHeight
+        anchors.fill: parent
         radius: Appearance.rounding.full
         color: Appearance.colors.colPrimaryContainer
 

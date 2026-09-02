@@ -111,8 +111,8 @@ RippleButton {
     property int listCount: ListView.view ? ListView.view.count : 1
     property int listCurrentIndex: ListView.view ? ListView.view.currentIndex : -1
 
-    readonly property bool isFirst: listIndex === 0
-    readonly property bool isLast: listIndex === listCount - 1
+    property bool isFirst: listIndex === 0
+    property bool isLast: listIndex === listCount - 1
     readonly property bool isSelected: listIndex === listCurrentIndex
     readonly property bool isAboveSelected: listCurrentIndex === listIndex + 1 && listCurrentIndex !== -1
     readonly property bool isBelowSelected: listCurrentIndex === listIndex - 1 && listCurrentIndex !== -1
@@ -146,13 +146,13 @@ RippleButton {
                 root.itemExecute();
             }
         });
-        if (root.entry?.type === Translation.tr("App")) {
-            const isPinned = TaskbarApps.isPinned(root.entry.id);
+        if (root.entry?.type === Translation.tr("App") || root.itemType === Translation.tr("App")) {
+            const isPinned = TaskbarApps.isPinned(root.entry ? root.entry.id : root.iconName);
             items.push({
                 name: isPinned ? Translation.tr("Unpin from Dock") : Translation.tr("Pin to Dock"),
                 icon: isPinned ? "keep_off" : "keep",
                 execute: () => {
-                    TaskbarApps.togglePin(root.entry.id);
+                    TaskbarApps.togglePin(root.entry ? root.entry.id : root.iconName);
                     root.actionPanelOpen = false;
                 }
             });
@@ -160,7 +160,7 @@ RippleButton {
                 name: Translation.tr("Copy ID"),
                 icon: "content_copy",
                 execute: () => {
-                    Quickshell.clipboardText = root.entry.id;
+                    Quickshell.clipboardText = root.entry ? root.entry.id : root.iconName;
                     root.actionPanelOpen = false;
                 }
             });
@@ -168,7 +168,7 @@ RippleButton {
                 name: Translation.tr("Reset"),
                 icon: "restart_alt",
                 execute: () => {
-                    AppUsage.resetRanking(root.entry.id);
+                    AppUsage.resetRanking(root.entry ? root.entry.id : root.iconName);
                     root.actionPanelOpen = false;
                 }
             });
@@ -495,6 +495,7 @@ RippleButton {
                             visible: root.iconType === LauncherSearchResult.IconType.Material
                             text: root.materialSymbol
                             iconSize: 26
+                            fill: root.isSelected ? 1.0 : 0.0
                             color: root.colForeground
                             Behavior on iconSize {
                                 NumberAnimation {
@@ -545,6 +546,7 @@ RippleButton {
                         visible: !root.actionPanelOpen
 
                         RowLayout {
+                            id: titleRow
                             visible: !root.entry?.isMath
                             Layout.fillWidth: true
                             Rectangle {
@@ -594,7 +596,7 @@ RippleButton {
                                 model: root.query == root.itemName ? [] : root.urls
                                 Favicon {
                                     required property var modelData
-                                    size: parent.height
+                                    size: Math.max(1, titleRow.height)
                                     url: modelData
                                 }
                             }
@@ -769,7 +771,7 @@ RippleButton {
                                     font.pixelSize: 9
                                     font.family: Appearance.font.family.main
                                     font.weight: Font.Bold
-                                    color: Appearance.colors.colOnSurfaceVariant
+                                    color: Appearance.colors.colOnSurfaceContainer
                                 }
                             }
                             Rectangle {
@@ -785,7 +787,7 @@ RippleButton {
                                     font.pixelSize: 9
                                     font.family: Appearance.font.family.main
                                     font.weight: Font.Bold
-                                    color: Appearance.colors.colOnSurfaceVariant
+                                    color: Appearance.colors.colOnSurfaceContainer
                                 }
                             }
                         }

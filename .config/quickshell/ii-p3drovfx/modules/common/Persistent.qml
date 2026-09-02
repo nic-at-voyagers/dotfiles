@@ -134,15 +134,20 @@ Singleton {
             property JsonObject sidebar: JsonObject {
                 property JsonObject policies: JsonObject {
                     property int tab: 0
-                    property JsonObject phone: JsonObject {
-                        property string activeDeviceId: ""
-                        property list<string> recentDeviceIds: []
-                        property string cachedNotificationsJson: ""
-                    }
+                        property JsonObject phone: JsonObject {
+                            property string activeDeviceId: ""
+                            property list<string> recentDeviceIds: []
+                            property string cachedNotificationsJson: ""
+                            property JsonObject scrcpy: JsonObject {
+                                property list<string> recentPackages: []
+                            }
+                        }
                 }
                 property JsonObject bottomGroup: JsonObject {
                     property bool collapsed: false
                     property int tab: 0
+                    property int todoTab: 0
+                    property int timerTab: 0
                 }
             }
 
@@ -157,6 +162,22 @@ Singleton {
 
             property JsonObject idle: JsonObject {
                 property bool inhibit: false
+                property real expiresAt: 0 // Epoch ms; 0 means indefinite. Must be real, not int
+                property real durationMinutes: 0 // Preset the timed session started from, 0 if none
+                property string sessionId: ""
+            }
+
+            property JsonObject keyboardBacklight: JsonObject {
+                property bool idleOffActive: false // Whether the idle monitor is the reason it's off
+                property int savedLevel: 0 // Level to return to once input resumes
+            }
+
+            property JsonObject nightLight: JsonObject {
+                property bool hasManual: false // Whether a manual toggle is currently overriding automatic mode
+                property bool manualActive: false
+                property real manualSetAt: 0 // Epoch ms, used to tell whether the override has expired
+                property int gamma: 100
+                property string gammaByMonitorJson: "{}"
                 property string sessionId: ""
             }
 
@@ -229,10 +250,28 @@ Singleton {
                     property real height: 330
                     property int tabIndex: 0
                 }
+                property JsonObject discordVoice: JsonObject {
+                    property bool pinned: false
+                    property bool clickthrough: false
+                    property real x: 80
+                    property real y: 600
+                    property real width: 344
+                    property real height: 200
+                }
+            }
+
+            property JsonObject phoneCamera: JsonObject {
+                property string lastMode: "wifi"   // "wifi" | "usb"
+                property string lastIp: ""
+                property int lastPort: 4747
             }
 
             property JsonObject phoneMic: JsonObject {
                 property string originalDefaultSink: ""
+                property string lastBackend: ""     // "scrcpy" | "droidcam"
+                property string lastMode: "wifi"
+                property string lastIp: ""
+                property int lastPort: 4748
             }
 
             property JsonObject screenRecord: JsonObject {
@@ -243,12 +282,13 @@ Singleton {
             }
 
             property JsonObject settings: JsonObject {
+                property list<string> collapsedGroups: []
                 property JsonObject fonts: JsonObject {
                     property string main: "Google Sans Flex"
                     property string numbers: "Google Sans Flex"
                     property string title: "Google Sans Flex"
-                    property string iconNerd: "JetBrains Mono NF"
-                    property string monospace: "JetBrains Mono NF"
+                    property string iconNerd: "JetBrainsMono Nerd Font"
+                    property string monospace: "JetBrainsMono Nerd Font"
                     property string reading: "Readex Pro"
                     property string expressive: "Space Grotesk"
                     property bool roundnessFull: false
@@ -269,6 +309,11 @@ Singleton {
                 }
             }
             property list<var> alarms: []
+            property JsonObject water: JsonObject {
+                property int glassesDrunk: 0
+                property string lastDate: ""
+                property real lastNotify: 0
+            }
             property JsonObject media: JsonObject {
             }
 

@@ -5,16 +5,12 @@ pragma ComponentBehavior: Bound
 //@ pragma Env QT_QUICK_FLICKABLE_WHEEL_DECELERATION=10000
 
 import QtQuick
-import QtQuick.Controls
 import QtQuick.Layouts
-import QtQuick.Window
 import Quickshell
 import qs.services
 import qs.modules.common
-import qs.modules.common.widgets
 import qs.modules.common.functions as CF
 import "modules/settings"
-import "modules/settings/configs"
 
 FloatingWindow {
     id: root
@@ -30,167 +26,281 @@ FloatingWindow {
     property int lastSearchIndex: -1
     property int resultsCount: 0
     property string activeSearchQuery: ""
+    property string pendingSearchText: ""
 
     property string pendingSectionHighlight: ""
+    property string pendingSubPage: ""
 
-    // ── Flat page list (order determines pageIndex) ──────────────────────
-    property var pages: [
-        // Group 1 – Look & Feel (indices 0..4)
-        {
-            name: Translation.tr("Colors & Themes"),
-            icon: "palette",
-            component: "modules/settings/configs/ColorsThemesConfig.qml"
-        },
-        {
-            name: Translation.tr("Bar & Status Bar"),
-            icon: "space_bar",
-            component: "modules/settings/configs/BarConfig.qml"
-        },
-        {
-            name: Translation.tr("Backgrounds"),
-            icon: "wallpaper",
-            component: "modules/settings/configs/BackgroundConfig.qml"
-        },
-        {
-            name: Translation.tr("Interface & Fonts"),
-            icon: "font_download",
-            component: "modules/settings/configs/InterfaceFontsConfig.qml"
-        },
-        {
-            name: Translation.tr("Presets"),
-            icon: "auto_awesome",
-            component: "modules/settings/configs/PresetsConfig.qml"
-        },
-        // Group 2 – Modules (indices 5..10)
-        {
-            name: Translation.tr("Sidebars & Panels"),
-            icon: "side_navigation",
-            component: "modules/settings/configs/SidebarsConfig.qml"
-        },
-        {
-            name: Translation.tr("Dock"),
-            icon: "dock_to_bottom",
-            component: "modules/settings/configs/DockConfig.qml"
-        },
-        {
-            name: Translation.tr("Workspaces"),
-            icon: "workspaces",
-            component: "modules/settings/configs/WorkspacesConfig.qml"
-        },
-        {
-            name: Translation.tr("Overview Screen"),
-            icon: "grid_view",
-            component: "modules/settings/configs/OverviewConfig.qml"
-        },
-        {
-            name: Translation.tr("Desktop Widgets"),
-            icon: "widgets",
-            component: "modules/settings/configs/WidgetsConfig.qml"
-        },
-        {
-            name: Translation.tr("Dynamic Island"),
-            icon: "water_drop",
-            component: "modules/settings/configs/DynamicIslandConfig.qml"
-        },
-        // Group 3 – Tools & Overlays (indices 11..15)
-        {
-            name: Translation.tr("System Overlays"),
-            icon: "picture_in_picture",
-            component: "modules/settings/configs/OverlaysConfig.qml"
-        },
-        {
-            name: Translation.tr("Region Selector"),
-            icon: "screenshot_region",
-            component: "modules/settings/configs/RegionSelectorConfig.qml"
-        },
-        {
-            name: Translation.tr("App Search"),
-            icon: "search",
-            component: "modules/settings/configs/AppSearchConfig.qml"
-        },
-        {
-            name: Translation.tr("Cheat Sheet"),
-            icon: "help",
-            component: "modules/settings/configs/CheatSheetConfig.qml"
-        },
-        {
-            name: Translation.tr("Hyprland Rules"),
-            icon: "rule",
-            component: "modules/settings/configs/HyprlandRulesConfig.qml"
-        },
-        // Group 4 – System & Services (indices 16..21)
-        {
-            name: Translation.tr("Monitors"),
-            icon: "monitor",
-            component: "modules/settings/configs/MonitorsConfig.qml"
-        },
-        {
-            name: Translation.tr("Core Services"),
-            icon: "settings_suggest",
-            component: "modules/settings/configs/CoreServicesConfig.qml"
-        },
-        {
-            name: Translation.tr("Sounds"),
-            icon: "volume_up",
-            component: "modules/settings/configs/SoundsConfig.qml"
-        },
-        {
-            name: Translation.tr("Lock Screen"),
-            icon: "lock",
-            component: "modules/settings/configs/LockScreenConfig.qml"
-        },
-        {
-            name: Translation.tr("About & Updates"),
-            icon: "info",
-            component: "modules/settings/configs/AboutConfig.qml"
-        },
-        {
-            name: Translation.tr("User Profile"),
-            icon: "account_circle",
-            component: "modules/settings/configs/UserProfileConfig.qml"
-        },
-        {
-            name: Translation.tr("Search Results"),
-            icon: "search",
-            component: "modules/settings/configs/SearchPage.qml"
-        }
-    ]
+    // Settings navigation is intentionally session-local. The stack contains
+    // the states behind the current page, including an open sub-page, and is
+    // capped so a long exploratory session cannot grow without bound.
+    property var navigationHistory: []
+    property bool navigationHistoryActive: false
+    property bool restoringNavigation: false
+    property int observedHistoryPage: -1
+    property string observedHistorySubPage: ""
+    property var pendingNavigationRestore: null
 
-    // ── Grouped page list for Sidebar (references indices above) ─────────
-    property var pageGroups: [
-        {
-            name: Translation.tr("Look & Feel"),
-            pages: [0, 1, 2, 3, 4].map(i => ({
-                        name: pages[i].name,
-                        icon: pages[i].icon,
-                        pageIndex: i
-                    }))
-        },
-        {
-            name: Translation.tr("Modules"),
-            pages: [5, 6, 7, 8, 9, 10].map(i => ({
-                        name: pages[i].name,
-                        icon: pages[i].icon,
-                        pageIndex: i
-                    }))
-        },
-        {
-            name: Translation.tr("Tools & Overlays"),
-            pages: [11, 12, 13, 14, 15].map(i => ({
-                        name: pages[i].name,
-                        icon: pages[i].icon,
-                        pageIndex: i
-                    }))
-        },
-        {
-            name: Translation.tr("System & Services"),
-            pages: [16, 17, 18, 19, 20].map(i => ({
-                        name: pages[i].name,
-                        icon: pages[i].icon,
-                        pageIndex: i
-                    }))
+    function findSubPageHost(node) {
+        if (!node)
+            return null;
+        if (node.navigationPath !== undefined)
+            return node;
+
+        if (node.item) {
+            const itemHost = root.findSubPageHost(node.item);
+            if (itemHost)
+                return itemHost;
         }
-    ]
+
+        const children = node.children || [];
+        for (let i = 0; i < children.length; ++i) {
+            const childHost = root.findSubPageHost(children[i]);
+            if (childHost)
+                return childHost;
+        }
+        return null;
+    }
+
+    function currentSubPagePath() {
+        const host = root.findSubPageHost(pageLoader.item);
+        if (host && host.navigationPath !== undefined)
+            return host.navigationPath.map(value => value.toString());
+
+        if (!pageLoader.item || pageLoader.item.activeSubPage === undefined)
+            return [];
+        const url = pageLoader.item.activeSubPage.toString();
+        return url === "" ? [] : [url];
+    }
+
+    function currentSubPageUrl() {
+        const path = root.currentSubPagePath();
+        return path.length > 0 ? JSON.stringify(path) : "";
+    }
+
+    readonly property var activeNavigationHost: root.findSubPageHost(pageLoader.item)
+
+    function subPagePathFromState(state) {
+        if (!state || !state.subPage)
+            return [];
+        try {
+            const parsed = JSON.parse(state.subPage);
+            return Array.isArray(parsed) ? parsed : [state.subPage];
+        } catch (error) {
+            // Keep compatibility with the single-URL representation used
+            // before nested subpages were included in the history.
+            return [state.subPage];
+        }
+    }
+
+    // Deep links (search results, IPC) carry registry-relative paths such as
+    // "ai/CustomModelsConfig.qml". Loader resolves a relative source against
+    // ConfigSubPageHost.qml's own directory, which silently misses the file —
+    // so anchor every relative entry to the settings configs folder here.
+    function resolveSubPageEntry(value) {
+        const raw = String(value ?? "");
+        if (raw === "" || raw.indexOf("://") !== -1 || raw.startsWith("file:"))
+            return raw;
+        return Qt.resolvedUrl("modules/settings/configs/" + raw).toString();
+    }
+
+    function restoreSubPagePath(encodedPath) {
+        const path = encodedPath ? root.subPagePathFromState({ subPage: encodedPath }) : [];
+        const resolved = path.map(entry => root.resolveSubPageEntry(entry));
+        const host = root.findSubPageHost(pageLoader.item);
+        if (host && host.restoreNavigationPath) {
+            host.restoreNavigationPath(resolved);
+            return true;
+        }
+
+        if (pageLoader.item && pageLoader.item.activeSubPage !== undefined)
+            pageLoader.item.activeSubPage = resolved.length > 0 ? resolved[0] : "";
+        return false;
+    }
+
+    function sameNavigationState(a, b) {
+        return a && b && a.page === b.page && a.subPage === b.subPage;
+    }
+
+    function rememberObservedState() {
+        if (!root.navigationHistoryActive || root.restoringNavigation || root.observedHistoryPage < 0)
+            return;
+
+        const state = {
+            page: root.observedHistoryPage,
+            subPage: root.observedHistorySubPage
+        };
+        const last = root.navigationHistory.length > 0
+            ? root.navigationHistory[root.navigationHistory.length - 1]
+            : null;
+        if (root.sameNavigationState(last, state))
+            return;
+
+        let next = root.navigationHistory.concat([state]);
+        if (next.length > 10)
+            next = next.slice(next.length - 10);
+        root.navigationHistory = next;
+    }
+
+    function beginNavigationSession() {
+        root.navigationHistory = [];
+        root.restoringNavigation = false;
+        root.pendingNavigationRestore = null;
+        root.observedHistoryPage = root.currentPage;
+        root.observedHistorySubPage = root.currentSubPageUrl();
+        root.navigationHistoryActive = true;
+    }
+
+    function endNavigationSession() {
+        // A sub-page is part of the session too. Clear it when the window
+        // closes so reopening Settings always starts at the page itself and
+        // never inherits a stale overlay from the previous session.
+        if (pageLoader.item && pageLoader.item.activeSubPage !== undefined)
+            pageLoader.item.activeSubPage = "";
+        root.navigationHistoryActive = false;
+        root.navigationHistory = [];
+        root.restoringNavigation = false;
+        root.pendingNavigationRestore = null;
+        root.observedHistoryPage = -1;
+        root.observedHistorySubPage = "";
+    }
+
+    function handleObservedPageChanged() {
+        if (root.navigationHistoryActive && root.observedHistoryPage !== root.currentPage)
+            root.rememberObservedState();
+        root.observedHistoryPage = root.currentPage;
+        root.observedHistorySubPage = "";
+    }
+
+    function handleObservedSubPageChanged() {
+        const nextSubPage = root.currentSubPageUrl();
+        if (!root.navigationHistoryActive) {
+            root.observedHistorySubPage = nextSubPage;
+            return;
+        }
+        if (root.restoringNavigation) {
+            root.observedHistorySubPage = nextSubPage;
+            if (root.pendingNavigationRestore
+                    && nextSubPage === root.pendingNavigationRestore.subPage)
+                root.finishNavigationRestore();
+            return;
+        }
+        if (nextSubPage === root.observedHistorySubPage)
+            return;
+
+        // The built-in sub-page back buttons clear activeSubPage. If the
+        // previous stack entry is the page underneath, consume that entry
+        // instead of adding a duplicate forward transition.
+        const last = root.navigationHistory.length > 0
+            ? root.navigationHistory[root.navigationHistory.length - 1]
+            : null;
+        if (nextSubPage === "" && root.observedHistorySubPage !== ""
+                && root.sameNavigationState(last, { page: root.currentPage, subPage: "" })) {
+            root.navigationHistory = root.navigationHistory.slice(0, -1);
+        } else {
+            root.rememberObservedState();
+        }
+        root.observedHistorySubPage = nextSubPage;
+    }
+
+    function finishNavigationRestore() {
+        if (!root.restoringNavigation)
+            return;
+        root.pendingNavigationRestore = null;
+        root.observedHistoryPage = root.currentPage;
+        root.observedHistorySubPage = root.currentSubPageUrl();
+        Qt.callLater(() => root.restoringNavigation = false);
+    }
+
+    function navigateBack() {
+        if (!root.navigationHistoryActive || root.navigationHistory.length === 0)
+            return false;
+
+        const target = root.navigationHistory[root.navigationHistory.length - 1];
+        root.navigationHistory = root.navigationHistory.slice(0, -1);
+        root.restoringNavigation = true;
+        root.pendingNavigationRestore = target;
+
+        if (root.currentPage !== target.page) {
+            root.currentPage = target.page;
+        } else if (root.restoreSubPagePath(target.subPage)) {
+            // The corresponding navigation-path signal finishes the restore
+            // after all nested loaders have received their target pages.
+            if (target.subPage === root.currentSubPageUrl())
+                root.finishNavigationRestore();
+        } else {
+            root.finishNavigationRestore();
+        }
+        return true;
+    }
+
+    // ── Flat page list, derived from SettingsPageRegistry ────────────────
+    // Pages are addressed by stable `id`, not index — use pageIndexById().
+    property var pages: SettingsPageRegistry.pages.map(p => ({
+                id: p.id,
+                name: Translation.tr(p.name),
+                icon: p.icon,
+                component: p.component,
+                hidden: p.hidden === true
+            }))
+
+    // Hidden pages sit at the end of the list; nav pages come first.
+    readonly property int navPageCount: pages.filter(p => !p.hidden).length
+
+    function pageIndexById(id) {
+        return SettingsPageRegistry.pageIndexById(id);
+    }
+
+    function consumePendingSettingsPage() {
+        const pending = GlobalStates.consumePendingSettingsPage();
+        root.pendingSubPage = GlobalStates.settingsPendingSubPage || "";
+        GlobalStates.settingsPendingSubPage = "";
+        if (!pending || pending === "")
+            return;
+
+        const directIndex = root.pageIndexById(pending);
+        if (directIndex >= 0) {
+            const samePage = root.currentPage === directIndex;
+            root.currentPage = directIndex;
+            if (samePage && root.pendingSubPage !== ""
+                    && pageLoader.status === Loader.Ready) {
+                const targetSubPage = root.pendingSubPage;
+                root.pendingSubPage = "";
+                Qt.callLater(() => root.restoreSubPagePath(targetSubPage));
+            }
+            return;
+        }
+
+        // Keep compatibility with older callers that passed a component name.
+        for (let i = 0; i < root.pages.length; i++) {
+            if (root.pages[i].component.indexOf(pending) !== -1) {
+                root.currentPage = i;
+                break;
+            }
+        }
+    }
+
+    function cycleNavPage(delta) {
+        if (root.currentPage >= root.navPageCount) {
+            root.currentPage = delta > 0 ? 0 : root.navPageCount - 1;
+            return;
+        }
+        root.currentPage = (root.currentPage + delta + root.navPageCount) % root.navPageCount;
+    }
+
+    // ── Grouped page list for Sidebar ────────────────────────────────────
+    property var pageGroups: SettingsPageRegistry.groups.map(g => ({
+                id: g.id,
+                name: Translation.tr(g.name),
+                pages: g.pageIds.map(id => {
+                    const i = SettingsPageRegistry.pageIndexById(id);
+                    return {
+                        name: Translation.tr(SettingsPageRegistry.pages[i].name),
+                        icon: SettingsPageRegistry.pages[i].icon,
+                        pageIndex: i
+                    };
+                })
+            }))
 
     title: "illogical-impulse Settings"
     implicitWidth: 1100
@@ -203,38 +313,109 @@ FloatingWindow {
         function onSettingsOpenChanged() {
             root.visible = GlobalStates.settingsOpen;
             if (GlobalStates.settingsOpen) {
+                root.navigationHistoryActive = false;
+                SearchRegistry.setSettingsActive(true);
                 settingsSearchBar.forceFocus();
-                if (GlobalStates.settingsPendingPageName !== "") {
-                    for (let i = 0; i < root.pages.length; i++) {
-                        if (root.pages[i].component.indexOf(GlobalStates.settingsPendingPageName) !== -1) {
-                            root.currentPage = i;
-                            break;
-                        }
-                    }
-                    GlobalStates.settingsPendingPageName = "";
-                } else if (GlobalStates.settingsPendingPage >= 0) {
-                    root.currentPage = GlobalStates.settingsPendingPage;
-                    GlobalStates.settingsPendingPage = -1;
-                }
+                root.consumePendingSettingsPage();
+                Qt.callLater(() => root.beginNavigationSession());
+            } else {
+                root.pendingSearchText = "";
+                SearchRegistry.setSettingsActive(false);
+                root.endNavigationSession();
             }
         }
     }
 
+    Connections {
+        target: GlobalStates
+        function onSettingsNavigationRequestChanged() {
+            if (!GlobalStates.settingsOpen || !root.visible)
+                return;
+            root.consumePendingSettingsPage();
+            settingsSearchBar.forceFocus();
+        }
+    }
+
+    Connections {
+        target: SearchRegistry
+        function onIndexReady() {
+            if (!root.visible || root.pendingSearchText === "")
+                return;
+            const query = root.pendingSearchText;
+            root.pendingSearchText = "";
+            root.acceptSearch(query);
+        }
+    }
+
     onVisibleChanged: {
-        if (!visible && GlobalStates.settingsOpen)
-            GlobalStates.settingsOpen = false;
+        if (!visible) {
+            root.pendingSearchText = "";
+            SearchRegistry.setSettingsActive(false);
+            root.endNavigationSession();
+            if (GlobalStates.settingsOpen)
+                GlobalStates.settingsOpen = false;
+        } else if (GlobalStates.settingsOpen) {
+            SearchRegistry.setSettingsActive(true);
+            Qt.callLater(() => root.ensurePageReady());
+        }
     }
 
     Component.onCompleted: {
         root.visible = GlobalStates.settingsOpen;
+        if (root.visible) {
+            Qt.callLater(() => {
+                SearchRegistry.setSettingsActive(true);
+                root.beginNavigationSession();
+            });
+        }
         MaterialThemeLoader.reapplyTheme();
-        Config.readWriteDelay = 0; // Settings app always only sets one var at a time so delay isn't needed
         // Re-apply ignore alpha rule: Settings is lazy-loaded, so the rule fired
         // in Appearance.onIgnoreAlphaChanged before this window existed. Re-send
         // now that the xdg-toplevel is mapped and Hyprland can match it.
         var a = Appearance.ignoreAlpha;
         Quickshell.execDetached(["hyprctl", "eval",
             "hl.window_rule({ match = { title = '^(illogical-impulse Settings)$' }, no_blur = false, ignorealpha = " + a + " })"]);
+    }
+
+    function acceptSearch(text) {
+        const result = SearchRegistry.getDynamicSearchResults(text);
+
+        if (result == null || result.length === 0) {
+            settingsSearchBar.shakeNoResults();
+            root.activeSearchQuery = "";
+            root.resultsCount = 0;
+            root.lastSearchIndex = -1;
+            if (root.currentPage === root.pageIndexById("search")) {
+                root.currentPage = root.previousPage;
+            }
+            return;
+        }
+
+        let totalWidgets = 0;
+        for (let s of result) {
+            totalWidgets += s.items.length;
+            for (let sub of s.subsections) {
+                totalWidgets += sub.items.length;
+            }
+        }
+
+        root.resultsCount = totalWidgets;
+        root.lastSearchIndex = 0;
+
+        if (root.currentPage !== root.pageIndexById("search")) {
+            root.previousPage = root.currentPage;
+        }
+        root.activeSearchQuery = text;
+        SearchRegistry.currentSearch = text;
+        root.currentPage = root.pageIndexById("search");
+    }
+
+    function ensurePageReady() {
+        if (!root.visible || !Config.ready)
+            return;
+        if (pageLoader.status === Loader.Loading || pageLoader.status === Loader.Ready)
+            return;
+        pageLoader.beginGatedLoad(root.pages[root.currentPage].component);
     }
 
     Rectangle {
@@ -253,18 +434,20 @@ FloatingWindow {
         }
 
         Keys.onPressed: event => {
+            // Cycling only covers nav pages — hidden pages (profile, search
+            // results) are reachable through their own entry points.
             if (event.modifiers === Qt.ControlModifier) {
                 if (event.key === Qt.Key_PageDown) {
-                    root.currentPage = Math.min(root.currentPage + 1, root.pages.length - 1);
+                    root.currentPage = Math.min(root.currentPage + 1, root.navPageCount - 1);
                     event.accepted = true;
                 } else if (event.key === Qt.Key_PageUp) {
-                    root.currentPage = Math.max(root.currentPage - 1, 0);
+                    root.currentPage = Math.max(Math.min(root.currentPage, root.navPageCount) - 1, 0);
                     event.accepted = true;
                 } else if (event.key === Qt.Key_Tab) {
-                    root.currentPage = (root.currentPage + 1) % root.pages.length;
+                    root.cycleNavPage(1);
                     event.accepted = true;
                 } else if (event.key === Qt.Key_Backtab) {
-                    root.currentPage = (root.currentPage - 1 + root.pages.length) % root.pages.length;
+                    root.cycleNavPage(-1);
                     event.accepted = true;
                 }
             }
@@ -281,8 +464,8 @@ FloatingWindow {
                 id: userHeader
                 Layout.preferredWidth: 230
                 Layout.fillHeight: true
-                isActive: root.currentPage === 21
-                onClicked: root.currentPage = 21
+                isActive: root.currentPage === root.pageIndexById("profile")
+                onClicked: root.currentPage = root.pageIndexById("profile")
             }
 
             SearchBar {
@@ -294,8 +477,10 @@ FloatingWindow {
                 resultsCount: root.resultsCount
 
                 onTextChanged: text => {
+                    if (text === "")
+                        root.pendingSearchText = "";
                     if (text === "") {
-                        if (root.currentPage === 22) {
+                        if (root.currentPage === root.pageIndexById("search")) {
                             root.currentPage = root.previousPage;
                         }
                         root.activeSearchQuery = "";
@@ -305,41 +490,23 @@ FloatingWindow {
                 }
 
                 onAccepted: text => {
-                    const result = SearchRegistry.getDynamicSearchResults(text);
-
-                    if (result == null || result.length === 0) {
-                        settingsSearchBar.shakeNoResults();
-                        root.activeSearchQuery = "";
-                        root.resultsCount = 0;
-                        root.lastSearchIndex = -1;
-                        if (root.currentPage === 22) {
-                            root.currentPage = root.previousPage;
-                        }
+                    if (text.trim() === "") {
+                        root.acceptSearch(text);
                         return;
                     }
-
-                    let totalWidgets = 0;
-                    for (let s of result) {
-                        totalWidgets += s.items.length;
-                        for (let sub of s.subsections) {
-                            totalWidgets += sub.items.length;
-                        }
+                    if (!SearchRegistry.indexed) {
+                        root.pendingSearchText = text;
+                        SearchRegistry.ensureIndexing();
+                        return;
                     }
-
-                    root.resultsCount = totalWidgets;
-                    root.lastSearchIndex = 0;
-
-                    if (root.currentPage !== 22) {
-                        root.previousPage = root.currentPage;
-                    }
-                    root.activeSearchQuery = text;
-                    SearchRegistry.currentSearch = text;
-                    root.currentPage = 22;
+                    root.acceptSearch(text);
                 }
 
                 onCloseRequested: GlobalStates.settingsOpen = false
             }
         }
+
+        ConfigHealthBanner {}
 
         RowLayout { // Window content with sidebar and content pane
             Layout.fillWidth: true
@@ -374,22 +541,94 @@ FloatingWindow {
                     opacity: 1.0
                     transformOrigin: Item.Left
 
-                    active: Config.ready
+                    active: Config.ready && pageLoadArmed
                     asynchronous: true
+
+                    property bool pageLoadArmed: false
+                    property bool _skeletonGateActive: false
+
                     Component.onCompleted: {
-                        source = root.pages[root.currentPage].component;
+                        Qt.callLater(() => root.ensurePageReady());
                     }
 
                     property bool _waitingForLoad: false
 
+                    function beginGatedLoad(nextSource) {
+                        if (!nextSource || nextSource === "")
+                            return;
+
+                        pageLoadArmed = false;
+                        _skeletonGateActive = true;
+                        _waitingForLoad = true;
+                        pageSkeleton.revealed = true;
+                        skeletonDelayTimer.stop();
+                        source = nextSource;
+                        pageActivationTimer.restart();
+                    }
+
+                    function resetPageSkeleton() {
+                        skeletonDelayTimer.stop();
+                        pageSkeleton.revealed = false;
+                    }
+
+                    function handlePageLoadStarted() {
+                        if (_skeletonGateActive)
+                            return;
+                        pageSkeleton.revealed = false;
+                        skeletonDelayTimer.restart();
+                    }
+
+                    function handlePageLoadFailed() {
+                        _skeletonGateActive = false;
+                        pageLoadArmed = false;
+                        resetPageSkeleton();
+                        _waitingForLoad = false;
+                    }
+
                     onLoaded: {
+                        _skeletonGateActive = false;
+                        skeletonDelayTimer.stop();
+                        pageSkeleton.revealed = false;
                         if (root.pendingSectionHighlight !== "") {
                             pendingHighlightTimer.restart();
                         }
+                        if (root.pendingSubPage !== undefined && root.pendingSubPage !== "") {
+                            const targetSub = root.pendingSubPage;
+                            root.pendingSubPage = "";
+                            root.restoreSubPagePath(targetSub);
+                        }
                         if (_waitingForLoad) {
                             _waitingForLoad = false;
-                            pageLoadWaitTimer.stop();
                             switchAnimIncoming.start();
+                        }
+                        if (root.restoringNavigation && root.pendingNavigationRestore
+                                && root.pendingNavigationRestore.page === root.currentPage) {
+                            const targetSubPage = root.pendingNavigationRestore.subPage;
+                            if (!root.restoreSubPagePath(targetSubPage))
+                                root.finishNavigationRestore();
+                        }
+                    }
+
+                    onStatusChanged: {
+                        if (status === Loader.Loading) {
+                            handlePageLoadStarted();
+                        } else if (status === Loader.Error) {
+                            handlePageLoadFailed();
+                        }
+                    }
+
+                    onSourceChanged: {
+                        if (source !== "")
+                            handlePageLoadStarted();
+                    }
+
+                    Timer {
+                        id: pageActivationTimer
+                        interval: 48
+                        repeat: false
+                        onTriggered: {
+                            if (root.visible && Config.ready)
+                                pageLoader.pageLoadArmed = true;
                         }
                     }
 
@@ -405,9 +644,20 @@ FloatingWindow {
                         }
                     }
 
+                    Timer {
+                        id: skeletonDelayTimer
+                        interval: 90
+                        repeat: false
+                        onTriggered: {
+                            if (pageLoader.status === Loader.Loading || pageLoader._waitingForLoad)
+                                pageSkeleton.revealed = true;
+                        }
+                    }
+
                     Connections {
                         target: root
                         function onCurrentPageChanged() {
+                            root.handleObservedPageChanged();
                             switchAnimOutgoing.complete();
                             switchAnimOutgoing.start();
                         }
@@ -436,59 +686,21 @@ FloatingWindow {
                                 property: "opacity"
                                 from: 1
                                 to: 0
-                                duration: 150
-                                easing.type: Easing.BezierSpline
-                                easing.bezierCurve: Appearance.animationCurves.emphasizedAccel
+                                duration: 100
+                                easing.type: Easing.OutQuad
                             }
                             NumberAnimation {
                                 target: pageLoader
                                 property: "scale"
                                 from: 1
-                                to: 0.95
-                                duration: 150
-                                easing.type: Easing.BezierSpline
-                                easing.bezierCurve: Appearance.animationCurves.emphasizedAccel
-                            }
-                            NumberAnimation {
-                                target: pageLoader
-                                property: "x"
-                                from: 0
-                                to: 120
-                                duration: 150
-                                easing.type: Easing.BezierSpline
-                                easing.bezierCurve: Appearance.animationCurves.emphasizedAccel
+                                to: 0.97
+                                duration: 100
+                                easing.type: Easing.OutQuad
                             }
                         }
                         onFinished: {
-                            pageLoader.source = root.pages[root.currentPage].component;
-                            pageLoader.x = -120;
-                            pageLoader._waitingForLoad = true;
-                            pageLoadWaitTimer.start();
-                        }
-                    }
-
-                    Timer {
-                        id: pageLoadWaitTimer
-                        interval: 16
-                        repeat: true
-                        property real _startTime: 0
-                        onTriggered: {
-                            if (!pageLoader._waitingForLoad) {
-                                stop();
-                                return;
-                            }
-                            if (pageLoader.status === Loader.Ready) {
-                                pageLoader._waitingForLoad = false;
-                                stop();
-                                switchAnimIncoming.start();
-                            } else if (Date.now() - _startTime > 2000) {
-                                pageLoader._waitingForLoad = false;
-                                stop();
-                                switchAnimIncoming.start();
-                            }
-                        }
-                        onRunningChanged: {
-                            if (running) _startTime = Date.now();
+                            pageLoader.x = 0;
+                            pageLoader.beginGatedLoad(root.pages[root.currentPage].component);
                         }
                     }
 
@@ -501,31 +713,57 @@ FloatingWindow {
                                 property: "opacity"
                                 from: 0
                                 to: 1
-                                duration: 400
-                                easing.type: Easing.BezierSpline
-                                easing.bezierCurve: Appearance.animationCurves.emphasizedDecel
+                                duration: 180
+                                easing.type: Easing.OutCubic
                             }
                             NumberAnimation {
                                 target: pageLoader
                                 property: "scale"
-                                from: 0.95
+                                from: 0.97
                                 to: 1
-                                duration: 400
-                                easing.type: Easing.BezierSpline
-                                easing.bezierCurve: Appearance.animationCurves.emphasizedDecel
-                            }
-                            NumberAnimation {
-                                target: pageLoader
-                                property: "x"
-                                to: 0
-                                duration: 400
-                                easing.type: Easing.BezierSpline
-                                easing.bezierCurve: Appearance.animationCurves.emphasizedDecel
+                                duration: 180
+                                easing.type: Easing.OutCubic
                             }
                         }
                     }
+
                 } // closes Loader
+
+                SettingsPageSkeleton {
+                    id: pageSkeleton
+                    anchors.fill: parent
+                    z: 1
+                }
             } // closes Rectangle (Content container)
         } // closes RowLayout (Window content)
+
+        // XButton1/Qt.BackButton is handled by a pointer handler attached to
+        // the content Item, so it can receive the event from any Settings
+        // control without adding a cursor-owning overlay.
+        TapHandler {
+            acceptedButtons: Qt.BackButton | Qt.ExtraButton1
+            grabPermissions: PointerHandler.CanTakeOverFromAnything
+            onTapped: (eventPoint, button) => {
+                root.navigateBack();
+            }
+        }
     } // closes ColumnLayout
+
+    // Keep observation reactive to the actual page host. This also catches
+    // nested hosts whose activeSubPage changes without replacing the page
+    // Loader item.
+    readonly property string liveSubPagePath: root.currentSubPageUrl()
+    onLiveSubPagePathChanged: root.handleObservedSubPageChanged()
+
+    Connections {
+        target: root.activeNavigationHost
+        ignoreUnknownSignals: true
+        function onNavigationPathChanged() {
+            root.handleObservedSubPageChanged();
+        }
+        function onNavigationChanged() {
+            root.handleObservedSubPageChanged();
+        }
+    }
+
 }

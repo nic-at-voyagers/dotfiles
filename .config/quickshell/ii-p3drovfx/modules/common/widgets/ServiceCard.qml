@@ -18,30 +18,80 @@ RippleButton {
     Layout.fillWidth: true
     implicitHeight: contentLayout.implicitHeight + 32
     font.pixelSize: Appearance.font.pixelSize.small
+    useDynamicRadius: true
     buttonRadius: Appearance.rounding.large
+
+    readonly property bool isHorizontalLayout: {
+        var p = parent;
+        if (!p) return false;
+        var pStr = p.toString();
+        return (pStr.indexOf("RowLayout") !== -1 || pStr.indexOf("Row") !== -1) && pStr.indexOf("Column") === -1;
+    }
 
     readonly property int itemIndex: {
         var p = parent;
-        if (!p)
-            return 0;
-        var idx = 0;
-        for (var i = 0; i < p.children.length; ++i) {
-            if (p.children[i] === root)
-                return idx;
-            if (p.children[i].visible && typeof p.children[i].topLeftRadius !== "undefined")
-                idx++;
+        if (!p) return 0;
+        var children = p.children;
+        var selfIdx = -1;
+        for (var i = 0; i < children.length; ++i) {
+            if (children[i] === root) {
+                selfIdx = i;
+                break;
+            }
         }
-        return 0;
+        if (selfIdx === -1) return 0;
+        
+        var startIdx = 0;
+        for (var i = selfIdx - 1; i >= 0; --i) {
+            if (children[i].visible && typeof children[i].topLeftRadius === "undefined") {
+                startIdx = i + 1;
+                break;
+            }
+        }
+        
+        var idx = 0;
+        for (var i = startIdx; i < selfIdx; ++i) {
+            if (children[i].visible && typeof children[i].topLeftRadius !== "undefined") {
+                idx++;
+            }
+        }
+        return idx;
     }
 
     readonly property int totalItems: {
         var p = parent;
-        if (!p)
-            return 1;
+        if (!p) return 1;
+        var children = p.children;
+        var selfIdx = -1;
+        for (var i = 0; i < children.length; ++i) {
+            if (children[i] === root) {
+                selfIdx = i;
+                break;
+            }
+        }
+        if (selfIdx === -1) return 1;
+        
+        var startIdx = 0;
+        for (var i = selfIdx - 1; i >= 0; --i) {
+            if (children[i].visible && typeof children[i].topLeftRadius === "undefined") {
+                startIdx = i + 1;
+                break;
+            }
+        }
+        
+        var endIdx = children.length - 1;
+        for (var i = selfIdx + 1; i < children.length; ++i) {
+            if (children[i].visible && typeof children[i].topLeftRadius === "undefined") {
+                endIdx = i - 1;
+                break;
+            }
+        }
+        
         var count = 0;
-        for (var i = 0; i < p.children.length; ++i) {
-            if (p.children[i].visible && typeof p.children[i].topLeftRadius !== "undefined")
+        for (var i = startIdx; i <= endIdx; ++i) {
+            if (children[i].visible && typeof children[i].topLeftRadius !== "undefined") {
                 count++;
+            }
         }
         return count;
     }
@@ -52,22 +102,28 @@ RippleButton {
     readonly property bool prevIsPressed: {
         var p = parent;
         if (!p) return false;
-        for (var i = 0; i < p.children.length; ++i) {
-            var child = p.children[i];
-            if (child === root) return false;
-            if (child.visible && typeof child.topLeftRadius !== "undefined") {
-                var isImmediatePrev = true;
-                for (var j = i + 1; j < p.children.length; ++j) {
-                    var midChild = p.children[j];
-                    if (midChild === root) break;
-                    if (midChild.visible && typeof midChild.topLeftRadius !== "undefined") {
-                        isImmediatePrev = false;
-                        break;
-                    }
-                }
-                if (isImmediatePrev) {
-                    return child.isPressed === true || (child.down !== undefined && child.down === true);
-                }
+        var children = p.children;
+        var selfIdx = -1;
+        for (var i = 0; i < children.length; ++i) {
+            if (children[i] === root) {
+                selfIdx = i;
+                break;
+            }
+        }
+        if (selfIdx <= 0) return false;
+        
+        var startIdx = 0;
+        for (var i = selfIdx - 1; i >= 0; --i) {
+            if (children[i].visible && (typeof children[i].topLeftRadius === "undefined" && typeof children[i].isFirst === "undefined")) {
+                startIdx = i + 1;
+                break;
+            }
+        }
+        
+        for (var i = selfIdx - 1; i >= startIdx; --i) {
+            var child = children[i];
+            if (child.visible && (typeof child.topLeftRadius !== "undefined" || typeof child.isFirst !== "undefined")) {
+                return child.isPressed === true || (child.down !== undefined && child.down === true);
             }
         }
         return false;
@@ -76,14 +132,27 @@ RippleButton {
     readonly property bool nextIsPressed: {
         var p = parent;
         if (!p) return false;
-        var foundSelf = false;
-        for (var i = 0; i < p.children.length; ++i) {
-            var child = p.children[i];
-            if (child === root) {
-                foundSelf = true;
-                continue;
+        var children = p.children;
+        var selfIdx = -1;
+        for (var i = 0; i < children.length; ++i) {
+            if (children[i] === root) {
+                selfIdx = i;
+                break;
             }
-            if (foundSelf && child.visible && typeof child.topLeftRadius !== "undefined") {
+        }
+        if (selfIdx === -1 || selfIdx >= children.length - 1) return false;
+        
+        var endIdx = children.length - 1;
+        for (var i = selfIdx + 1; i < children.length; ++i) {
+            if (children[i].visible && (typeof children[i].topLeftRadius === "undefined" && typeof children[i].isFirst === "undefined")) {
+                endIdx = i - 1;
+                break;
+            }
+        }
+        
+        for (var i = selfIdx + 1; i <= endIdx; ++i) {
+            var child = children[i];
+            if (child.visible && (typeof child.topLeftRadius !== "undefined" || typeof child.isFirst !== "undefined")) {
                 return child.isPressed === true || (child.down !== undefined && child.down === true);
             }
         }
@@ -93,8 +162,8 @@ RippleButton {
     readonly property real rFull: Appearance.rounding.scale === 0 ? 0 : Math.min(height / 2, Appearance.rounding.large)
 
     topLeftRadius: (isPressed || prevIsPressed) ? rFull : (isFirst ? Appearance.rounding.large : Appearance.rounding.verysmall)
-    topRightRadius: (isPressed || prevIsPressed) ? rFull : (isFirst ? Appearance.rounding.large : Appearance.rounding.verysmall)
-    bottomLeftRadius: (isPressed || nextIsPressed) ? rFull : (isLast ? Appearance.rounding.large : Appearance.rounding.verysmall)
+    topRightRadius: (isPressed || prevIsPressed) ? rFull : (isHorizontalLayout ? (isLast ? Appearance.rounding.large : Appearance.rounding.verysmall) : (isFirst ? Appearance.rounding.large : Appearance.rounding.verysmall))
+    bottomLeftRadius: (isPressed || nextIsPressed) ? rFull : (isHorizontalLayout ? (isFirst ? Appearance.rounding.large : Appearance.rounding.verysmall) : (isLast ? Appearance.rounding.large : Appearance.rounding.verysmall))
     bottomRightRadius: (isPressed || nextIsPressed) ? rFull : (isLast ? Appearance.rounding.large : Appearance.rounding.verysmall)
 
     Behavior on topLeftRadius { animation: Appearance?.animation.elementMoveFast.numberAnimation.createObject(root) }
@@ -104,14 +173,23 @@ RippleButton {
 
     onClicked: root.openCard()
 
-    property color normalColor: Appearance.colors.colLayer2Base
+    property bool usePrimaryContainer: false
+    property color shapeColorOverride: "transparent"
+    property color symbolColorOverride: "transparent"
+
+    property color normalColor: Appearance.colors.colLayer2
 
     colBackground: normalColor
     colBackgroundHover: Appearance.colors.colLayer2Hover
     colRipple: Appearance.colors.colLayer2Active
 
-    readonly property color _tint: ColorUtils.categoryContainer(root.cardHue, Appearance.m3colors.m3primaryFixed, 0.5)
-    readonly property color _onTint: ColorUtils.categoryOnColor(root._tint, root.cardHue)
+    readonly property color _tint: shapeColorOverride !== "transparent" && shapeColorOverride.a > 0
+        ? shapeColorOverride
+        : (usePrimaryContainer ? Appearance.colors.colPrimaryContainer : ColorUtils.categoryContainer(root.cardHue, Appearance.m3colors.m3primaryFixed, 0.5))
+
+    readonly property color _onTint: symbolColorOverride !== "transparent" && symbolColorOverride.a > 0
+        ? symbolColorOverride
+        : (usePrimaryContainer ? Appearance.colors.colOnPrimaryContainer : ColorUtils.categoryOnColor(root._tint, root.cardHue))
 
     ScrollAnimate {}
 

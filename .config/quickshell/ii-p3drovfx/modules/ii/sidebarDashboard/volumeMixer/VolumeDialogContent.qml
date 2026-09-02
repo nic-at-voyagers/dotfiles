@@ -496,9 +496,12 @@ StyledFlickable {
                 cursorShape: devEntry.isBlocked ? Qt.ArrowCursor : Qt.PointingHandCursor
                 enabled: !devEntry.isBlocked
 
+                property bool wasActiveOnPress: false
+
                 onPressed: mouse => {
                     root.interactive = false;
-                    if (devEntry.isActive) {
+                    wasActiveOnPress = devEntry.isActive;
+                    if (wasActiveOnPress) {
                         updateVolume(mouse.x);
                     } else {
                         devEntry.activateDevice();
@@ -514,7 +517,7 @@ StyledFlickable {
                 }
 
                 onPositionChanged: mouse => {
-                    if (devEntry.isActive) {
+                    if (wasActiveOnPress && devEntry.isActive) {
                         updateVolume(mouse.x);
                     }
                 }
@@ -523,6 +526,29 @@ StyledFlickable {
                     let percentage = Math.max(0, Math.min(1.0, mouseX / mainRect.width));
                     if (devEntry.node && devEntry.node.audio) {
                         devEntry.node.audio.volume = percentage;
+                    }
+                }
+            }
+
+            Connections {
+                target: mainMouseArea
+                function onPressedChanged() {
+                    if (mainMouseArea.pressed) {
+                        if (devEntry.isSink) {
+                            root.activePlaybackDragIndex = devEntry.index;
+                        } else {
+                            root.activeRecordingDragIndex = devEntry.index;
+                        }
+                    } else {
+                        if (devEntry.isSink) {
+                            if (root.activePlaybackDragIndex === devEntry.index) {
+                                root.activePlaybackDragIndex = -1;
+                            }
+                        } else {
+                            if (root.activeRecordingDragIndex === devEntry.index) {
+                                root.activeRecordingDragIndex = -1;
+                            }
+                        }
                     }
                 }
             }

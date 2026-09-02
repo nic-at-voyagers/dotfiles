@@ -304,7 +304,7 @@ Item {
         implicitHeight: mainLayout.implicitHeight + root.contentPadding * 2
 
         radius: Appearance.rounding.large
-        color: Appearance.colors.colLayer1Base
+        color: Config.options.appearance.transparency.popups ? Appearance.colors.colLayer0 : Appearance.m3colors.m3surfaceContainer
 
         // Animations applied on the card itself to keep root window input mapping clean
         opacity: 0
@@ -339,10 +339,6 @@ Item {
             onClicked: mouse => mouse.accepted = true
             onPressed: mouse => mouse.accepted = true
             onReleased: mouse => mouse.accepted = true
-        }
-
-        StyledRectangularShadow {
-            target: contentBackground
         }
 
         ColumnLayout {
@@ -657,7 +653,7 @@ Item {
                     Rectangle {
                         id: variantCard
                         required property var modelData
-                        readonly property int index: model.index
+                        required property int index
                         Layout.fillWidth: true
                         implicitHeight: root.variantCardHeight
                         radius: Appearance.rounding.normal
@@ -699,7 +695,7 @@ Item {
                             anchors.margins: 12
                             text: modelData.title
                             color: root.getContrastColor(variantCard.color)
-                            font.pixelSize: Appearance.font.pixelSize.medium
+                            font.pixelSize: Appearance.font.pixelSize.normal
                             font.weight: Font.DemiBold
                         }
 

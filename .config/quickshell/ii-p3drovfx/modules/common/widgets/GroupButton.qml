@@ -29,13 +29,31 @@ Button {
     property real clickedWidth: baseWidth + (isAtSide ? 10 : 20)
     property real clickedHeight: baseHeight
     property var parentGroup: root.parent
-    property int indexInParent: parentGroup?.children.indexOf(root) ?? -1
     property int clickIndex: parentGroup?.clickIndex ?? -1
-    property bool isAtSide: indexInParent === 0 || indexInParent === (parentGroup?.childrenCount - 1)
+    property int indexInParent: {
+        if (clickIndex < 0 && !root.isPressed) return -1;
+        var p = parentGroup;
+        if (!p || !p.children) return -1;
+        for (var i = 0; i < p.children.length; ++i) {
+            if (p.children[i] === root) return i;
+        }
+        return -1;
+    }
+    property bool isAtSide: {
+        if (clickIndex < 0 && !root.isPressed) return false;
+        var p = parentGroup;
+        if (!p || !p.children) return false;
+        return indexInParent === 0 || indexInParent === (p.children.length - 1);
+    }
 
-    Layout.fillWidth: (clickIndex - 1 <= indexInParent && indexInParent <= clickIndex + 1)
-    Layout.fillHeight: (clickIndex - 1 <= indexInParent && indexInParent <= clickIndex + 1)
-    implicitWidth: (root.isPressed && bounce) ? clickedWidth : baseWidth
+    readonly property bool isNeighborPressed: {
+        if (clickIndex < 0) return false;
+        return Math.abs(indexInParent - clickIndex) === 1;
+    }
+
+    Layout.fillWidth: (clickIndex >= 0 && clickIndex - 1 <= indexInParent && indexInParent <= clickIndex + 1)
+    Layout.fillHeight: (clickIndex >= 0 && clickIndex - 1 <= indexInParent && indexInParent <= clickIndex + 1)
+    implicitWidth: (root.isPressed && bounce) ? clickedWidth : (isNeighborPressed && bounce ? Math.max(16, baseWidth - 6) : baseWidth)
     implicitHeight: (root.isPressed && bounce) ? clickedHeight : baseHeight
 
     property color colBackground: ColorUtils.transparentize(colBackgroundHover, 1) || "transparent"
@@ -57,9 +75,11 @@ Button {
             colBackground)) : colBackground
 
     onIsPressedChanged: {
-        if (root.isPressed) {
-            if (root.parent.clickIndex !== undefined) {
-                root.parent.clickIndex = parent.children.indexOf(root)
+        if (parentGroup && parentGroup.clickIndex !== undefined) {
+            if (root.isPressed) {
+                parentGroup.clickIndex = indexInParent;
+            } else if (parentGroup.clickIndex === indexInParent) {
+                parentGroup.clickIndex = -1;
             }
         }
     }

@@ -156,7 +156,7 @@ Item {
     Item {
         id: dropContainer
         x: positioner.anchorX
-        y: positioner.anchorY
+        y: root.barBottom ? (positioner.anchorY + (dropState.targetH - root.animHeight)) : positioner.anchorY
         width: dropState.targetW
         height: root.animHeight
         visible: root.animHeight > 0.001
@@ -208,27 +208,25 @@ Item {
 
         RoundCorner {
             id: bottomLeftCorner
-            visible: dropContainer._showCorners && root.barBottom
+            visible: false
             implicitSize: dropContainer._cornerRadius
             color: Config.options.bar.expressiveColors ? root.activeTheme.barBackground : Appearance.colors.colLayer0
-            corner: RoundCorner.CornerEnum.TopRight
-            extendHorizontal: true
-            extendVertical: true
+            corner: RoundCorner.CornerEnum.BottomRight
             anchors.right: parent.left
             anchors.bottom: parent.bottom
         }
 
         RoundCorner {
             id: bottomRightCorner
-            visible: dropContainer._showCorners && root.barBottom
+            visible: false
             implicitSize: dropContainer._cornerRadius
             color: Config.options.bar.expressiveColors ? root.activeTheme.barBackground : Appearance.colors.colLayer0
-            corner: RoundCorner.CornerEnum.TopLeft
-            extendHorizontal: true
-            extendVertical: true
+            corner: RoundCorner.CornerEnum.BottomLeft
             anchors.left: parent.right
             anchors.bottom: parent.bottom
         }
+
+
 
         Item {
             id: clippingClip

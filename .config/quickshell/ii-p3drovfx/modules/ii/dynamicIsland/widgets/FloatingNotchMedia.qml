@@ -44,6 +44,16 @@ Item {
         return root;
     }
 
+    readonly property real notchBottomRadius: {
+        var p = root.parent;
+        while (p) {
+            if (p.notchBackground && p.notchBackground.bottomRadius !== undefined)
+                return p.notchBackground.bottomRadius;
+            p = p.parent;
+        }
+        return Appearance.rounding.windowRounding;
+    }
+
     readonly property int elementHeight: Math.max(20, Math.min(42, root.height - 10))
     readonly property int barWidth: Math.max(4, Math.min(8, elementHeight / 5))
 
@@ -548,7 +558,7 @@ Item {
     }
 
     // Real Cava Visualizer integration
-    property var visualizerPoints: []
+    property var visualizerPoints: CavaService.visualizerPoints
 
     readonly property real bar0Val: visualizerPoints.length > 5 ? visualizerPoints[3] / 1000.0 : 0
     readonly property real bar1Val: visualizerPoints.length > 11 ? visualizerPoints[9] / 1000.0 : 0
@@ -589,18 +599,6 @@ Item {
         return Math.min(1.0, Math.max(0.0, val * 2.0));
     }
 
-    Process {
-        id: cavaProc
-        running: !root.isExpanded && root.playing
-        command: ["cava", "-p", `${FileUtils.trimFileProtocol(Directories.scriptPath)}/cava/raw_output_config.txt`]
-        stdout: SplitParser {
-            onRead: data => {
-                let points = data.split(";").map(p => parseFloat(p.trim())).filter(p => !isNaN(p));
-                root.visualizerPoints = points;
-            }
-        }
-    }
-
     Component.onCompleted: {
         LyricsService.initiliazeLyrics();
         root.displayTitle = root.title;
@@ -630,7 +628,7 @@ Item {
         Rectangle {
             id: contractedMaskRect
             anchors.fill: parent
-            radius: Appearance.rounding.small
+            radius: Math.max(0, root.notchBottomRadius - 4)
             visible: false
         }
 
@@ -944,7 +942,7 @@ Item {
         Rectangle {
             id: maskRect
             anchors.fill: parent
-            radius: Appearance.rounding.windowRounding
+            radius: Math.max(0, root.notchBottomRadius - 4)
             visible: false
         }
 

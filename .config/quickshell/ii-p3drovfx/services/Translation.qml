@@ -44,11 +44,9 @@ Singleton {
         translationsDir: root.generatedTranslationsDir
         onLanguagesScanned: (languages) => {
             root.availableGeneratedLanguages = [...languages];
+            generatedTranslationFileView.reread();
         }
     }
-
-    onAvailableLanguagesChanged: translationFileView.reread()
-    onAvailableGeneratedLanguagesChanged: generatedTranslationFileView.reread()
 
     onLanguageCodeChanged: {
         print("[Translation] Language changed to", root.languageCode);
@@ -63,8 +61,10 @@ Singleton {
         translationsDir: root.translationsDir
         languageCode: root.languageCode
         onContentLoaded: (data) => {
-            root.translations = data;
-            root.isLoading = false;
+            Qt.callLater(() => {
+                root.translations = data;
+                root.isLoading = false;
+            });
         }
     }
 
@@ -73,8 +73,10 @@ Singleton {
         translationsDir: root.generatedTranslationsDir
         languageCode: root.languageCode
         onContentLoaded: (data) => {
-            root.generatedTranslations = data;
-            root.isLoading = false;
+            Qt.callLater(() => {
+                root.generatedTranslations = data;
+                root.isLoading = false;
+            });
         }
     }
 
@@ -125,13 +127,14 @@ Singleton {
         signal contentLoaded(var data)
 
         function reread() { // Proper reload in case the file was incorrect before
-            const available = translationsDir === root.translationsDir ? root.availableLanguages : root.availableGeneratedLanguages;
-            if (available.indexOf(languageCode) === -1) {
+            translationReader.path = "";
+            const availableLanguages = translationReader === generatedTranslationFileView
+                ? root.availableGeneratedLanguages
+                : root.availableLanguages;
+            if (!availableLanguages || !availableLanguages.includes(translationReader.languageCode)) {
                 translationReader.contentLoaded({});
                 return;
             }
-
-            translationReader.path = "";
             translationReader.path = `${translationReader.translationsDir}/${translationReader.languageCode}.json`;
             translationReader.reload();
         }

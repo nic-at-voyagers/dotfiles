@@ -90,8 +90,9 @@ Item {
     }
 
     Layout.fillHeight: true
-    implicitWidth: vertical ? Appearance.sizes.verticalBarWidth : (root.lyricsAvailable ? lyricsCustomSize : (useFixedSize ? customSize : (isMaterial ? materialRow.implicitWidth : Math.min(rowLayout.implicitWidth + 8, 280))))
-    implicitHeight: vertical ? (isMaterial ? materialCol.implicitHeight : mediaCircProg.implicitHeight + 6) : Appearance.sizes.baseBarHeight
+    visible: hasTrack
+    implicitWidth: hasTrack ? (vertical ? Appearance.sizes.verticalBarWidth : (root.lyricsAvailable ? lyricsCustomSize : (useFixedSize ? customSize : (isMaterial ? materialRow.implicitWidth : Math.min(rowLayout.implicitWidth + 8, 280))))) : 0
+    implicitHeight: hasTrack ? (vertical ? (isMaterial ? materialCol.implicitHeight : mediaCircProg.implicitHeight + 6) : Appearance.sizes.baseBarHeight) : 0
 
     Behavior on implicitWidth {
         animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(root)
@@ -140,6 +141,15 @@ Item {
                     GlobalStates.mediaControlsOpen = !GlobalStates.mediaControlsOpen;
                 }
             }
+        }
+        onWheel: event => {
+            if (!Config.options.bar.mediaPlayer.enableVolumeScroll)
+                return;
+            if (event.angleDelta.y > 0)
+                MprisController.incrementVolume();
+            else if (event.angleDelta.y < 0)
+                MprisController.decrementVolume();
+            event.accepted = true;
         }
     }
 

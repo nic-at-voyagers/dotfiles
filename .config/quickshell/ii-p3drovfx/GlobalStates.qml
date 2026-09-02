@@ -14,11 +14,44 @@ Singleton {
     property alias sidebarRightOpen: root.dashboardPanelOpen // Until all sidebars naming is fixed
 
     property bool barOpen: true
+    property bool phoneCameraRunning: false
+    property bool phoneMicRunning: false
+    property int mediaModeCount: 0
+    readonly property bool mediaModeActive: mediaModeCount > 0
+    property var mediaModeMonitors: []
+    property int mediaModeCloseAllTrigger: 0
+    property int widgetReStackTrigger: 0
+
+    function setMediaModeActiveForScreen(screenName, active) {
+        if (!screenName)
+            return;
+        var list = mediaModeMonitors.slice();
+        var index = list.indexOf(screenName);
+        if (active && index === -1) {
+            list.push(screenName);
+        } else if (!active && index !== -1) {
+            list.splice(index, 1);
+        }
+        mediaModeMonitors = list;
+    }
+
+    function isMediaModeActiveForScreen(screenName) {
+        if (!Config.options.background.mediaMode.togglePerMonitor) {
+            return mediaModeActive;
+        }
+        if (!screenName)
+            return false;
+        return mediaModeMonitors.includes(screenName);
+    }
     property bool alarmRinging: false
     property bool cheatsheetOpen: false
     property bool crosshairOpen: false
+    property bool notesOpen: false
     property bool mediaControlsOpen: false
     property bool mediaControlsPinned: false
+    // Names of screens currently blacked out by the OLED saver overlay. Independent
+    // per monitor: toggling one monitor doesn't affect the others.
+    property var oledSaverMonitors: []
     property bool osdBrightnessOpen: false
     property bool osdVolumeOpen: false
     property bool oskOpen: false
@@ -34,6 +67,17 @@ Singleton {
     property bool regionSelectorOpen: false
     property bool searchOpen: false
     property bool screenLocked: false
+    // Shared transition clock for the bar and wrapped-frame visuals. Their
+    // PanelWindows stay mapped while this runs; each layer chooses fade or
+    // slide based on whether the wrapped frame is active.
+    property real lockBarTransitionProgress: screenLocked ? 1.0 : 0.0
+    Behavior on lockBarTransitionProgress {
+        // Use the non-overshooting effects curve for opacity. Spatial curves
+        // overshoot and make a fade look like an abrupt blink.
+        animation: Appearance.animation.elementMoveSlow.numberAnimation.createObject(root)
+    }
+    property bool lockScreenCentered: false
+    property bool lockAnimationActive: false
     property bool workspaceRestoreInProgress: false
     property bool capsLockActive: false
     property bool screenLockContainsCharacters: false
@@ -44,23 +88,41 @@ Singleton {
     signal lockScreenRipple(x: real, y: real)
     property bool sessionOpen: false
     property bool superDown: false
+    property bool usageOpen: false
     property bool superReleaseMightTrigger: true
     property bool wallpaperSelectorOpen: false
+    property string wallpaperSelectorTarget: "desktop" // "desktop" or "lockscreen"
     property bool workspaceShowNumbers: false
     property bool filePickerOpen: false
     property bool videoEditorPopupOpen: false
     property bool videoEditorOpen: false
     property string videoEditorPath: ""
+    property bool screenshotOverlayOpen: false
+    property string screenshotOverlayImagePath: ""
+    // Monitor that owns the current screenshot preview overlay.
+    property string screenshotOverlayMonitor: ""
+    property real screenshotOverlayRegionX: 0
+    property real screenshotOverlayRegionY: 0
+    property real screenshotOverlayRegionW: 0
+    property real screenshotOverlayRegionH: 0
     property bool settingsOpen: false
     property int settingsPendingPage: -1
     property string settingsPendingSubPage: ""
     property string settingsPendingPageName: ""
+    // Welcome is an in-process window. Keep its lifecycle in the shared state
+    // graph so first-run, keybinds and Settings deep links all use one owner.
+    property bool welcomeOpen: false
+    // A serial makes repeated requests observable even when the same page is
+    // requested twice while Settings is already visible.
+    property int settingsNavigationRequest: 0
     property string activeLeftSidebarMonitor: ""
     property string activeRightSidebarMonitor: ""
 
     function isScreenAllowedForBar(screen) {
-        if (!screen) return false;
-        if (!Config.ready) return true;
+        if (!screen)
+            return false;
+        if (!Config.ready)
+            return true;
         if (Config.options.bar.onlyShowOnSingleMonitor) {
             return screen.name === Config.options.bar.singleMonitorName;
         }
@@ -72,12 +134,14 @@ Singleton {
     }
 
     readonly property var allowedScreens: {
-        if (!Config.ready) return Quickshell.screens;
+        if (!Config.ready)
+            return Quickshell.screens;
         return Quickshell.screens.filter(screen => root.isScreenAllowedForBar(screen));
     }
 
     readonly property string effectiveLeftMonitor: {
-        if (!Config.ready) return "";
+        if (!Config.ready)
+            return "";
         switch (Config.options.sidebar.position) {
         case "default":
             return activeLeftSidebarMonitor;
@@ -93,7 +157,8 @@ Singleton {
     }
 
     readonly property string effectiveRightMonitor: {
-        if (!Config.ready) return "";
+        if (!Config.ready)
+            return "";
         switch (Config.options.sidebar.position) {
         case "default":
             return activeRightSidebarMonitor;
@@ -129,7 +194,7 @@ Singleton {
 
     property string osdCurrentIndicator: "volume"
     property string osdProtectionMessage: ""
-    signal osdInteraction()
+    signal osdInteraction
     property bool policiesExtended: false
     property bool policiesPinned: false
     property bool policiesDetached: false
@@ -172,7 +237,7 @@ Singleton {
     property bool mediaWidgetHovered: false
     property Timer mediaWidgetHoverTimer: Timer {
         id: mediaWidgetHoverTimer
-        interval: 4000
+        interval: 400
         repeat: false
         onTriggered: {
             root.mediaWidgetHovered = false;
@@ -195,7 +260,7 @@ Singleton {
     function pickColor(hex) {
         if (hex && hex.startsWith("#")) {
             root.colorPickerPopupColor = hex;
-            if (Config.options && Config.options.bar && Config.options.bar.tooltips && Config.options.bar.tooltips.enableColorPickerPopup) {
+            if (Config.options && Config.options.bar && Config.options.bar.tooltips && Config.options.bar.tooltips.enablePopups && Config.options.bar.tooltips.enableColorPickerPopup) {
                 root.colorPickerPopupOpen = false;
                 Qt.callLater(() => {
                     root.colorPickerPopupOpen = true;
@@ -215,8 +280,19 @@ Singleton {
         }
     }
 
+    function launchLosslessCut(path) {
+        root.videoEditorPath = path;
+        root.videoEditorPopupOpen = false;
+        root.videoEditorOpen = false;
+        Quickshell.execDetached(["gio", "launch", Directories.losslessCutDesktopPath, path]);
+    }
+
     function launchVideoEditor(path) {
         root.videoEditorPath = path;
+        // The "Recording Finished" prompt is opt-out: keep the path around so the
+        // editor can still be opened manually, just don't pop anything up.
+        if (!Config.options.screenRecord.showEditPrompt)
+            return;
         root.videoEditorPopupOpen = true;
     }
 
@@ -235,6 +311,57 @@ Singleton {
         root.settingsOpen = true;
     }
 
+    function openSettingsPage(pageId, subPageId, sectionId) {
+        const targetSubPage = subPageId || "";
+        if (!pageId || pageId === "") {
+            root.settingsPendingPageName = "";
+            root.settingsPendingSubPage = targetSubPage;
+            root.settingsOpen = true;
+            return;
+        }
+
+        if (SettingsPageRegistry.pageIndexById(pageId) < 0)
+            return;
+
+        root.settingsPendingPageName = pageId;
+        root.settingsPendingSubPage = targetSubPage;
+        root.settingsNavigationRequest += 1;
+        root.settingsOpen = true;
+    }
+
+    function consumePendingSettingsPage() {
+        const pending = root.settingsPendingPageName;
+        root.settingsPendingPageName = "";
+        return pending;
+    }
+
+    function toggleWelcome() {
+        root.welcomeOpen = !root.welcomeOpen;
+    }
+
+    function openWelcome() {
+        root.welcomeOpen = true;
+    }
+
+    function closeWelcome() {
+        root.welcomeOpen = false;
+    }
+
+    function toggleCheatsheet() {
+        root.cheatsheetOpen = !root.cheatsheetOpen;
+    }
+
+    function openCheatsheet() {
+        if (root.cheatsheetOpen) {
+            root.cheatsheetOpen = false;
+        }
+        root.cheatsheetOpen = true;
+    }
+
+    function closeCheatsheet() {
+        root.cheatsheetOpen = false;
+    }
+
     IpcHandler {
         target: "settings"
 
@@ -245,6 +372,74 @@ Singleton {
         function open(): void {
             root.openSettings();
         }
+
+        function openPage(pageId: string): void {
+            root.openSettingsPage(pageId);
+        }
+
+        function openSubPage(pageId: string, subPage: string): void {
+            root.openSettingsPage(pageId, subPage || "");
+        }
+
+    }
+
+    IpcHandler {
+        target: "welcome"
+
+        function toggle(): void {
+            root.toggleWelcome();
+        }
+
+        function open(): void {
+            root.openWelcome();
+        }
+
+        function close(): void {
+            root.closeWelcome();
+        }
+    }
+
+    IpcHandler {
+        target: "cheatsheet"
+
+        function toggle(): void {
+            root.toggleCheatsheet();
+        }
+
+        function open(): void {
+            root.openCheatsheet();
+        }
+
+        function close(): void {
+            root.closeCheatsheet();
+        }
+    }
+
+    IpcHandler {
+        target: "osd"
+
+        function trigger(): void {
+            root.osdCurrentIndicator = "volume";
+            root.osdVolumeOpen = true;
+            root.osdInteraction();
+        }
+
+        function toggle(): void {
+            root.osdVolumeOpen = !root.osdVolumeOpen;
+            if (root.osdVolumeOpen) {
+                root.osdInteraction();
+            }
+        }
+
+        function hide(): void {
+            root.osdVolumeOpen = false;
+        }
+
+        function open(): void {
+            root.osdCurrentIndicator = "volume";
+            root.osdVolumeOpen = true;
+            root.osdInteraction();
+        }
     }
 
     GlobalShortcut {
@@ -253,24 +448,7 @@ Singleton {
         onPressed: root.toggleSettings()
     }
 
-    readonly property bool connectModeActive: {
-        if (!Config.ready)
-            return false;
-        const style = Config.options.sidebar.sidebarStyle || "default";
-        if (style !== "connect")
-            return false;
-
-        // Connect style is disabled if the bar background style is Transparent
-        if (Config.options.bar.barBackgroundStyle === 0)
-            return false;
-
-        // Works in all rounding modes except Edge (4)
-        if (Config.options.appearance.fakeScreenRounding === 4)
-            return false;
-
-        // All corner styles now supported: 0 (Hug), 1 (Float), 2 (Rect), 3 (Dynamic Island)
-        return true;
-    }
+    readonly property bool connectModeActive: ShellModePolicy.connectModeActive
 
     // In Float mode (cornerStyle 1), sidebars remain as separate PanelWindows
     // rather than being embedded in the TopLayer. Only search/OSD are integrated.
@@ -278,13 +456,35 @@ Singleton {
         return connectModeActive && Config.options.bar.cornerStyle === 1;
     }
 
+    readonly property bool searchCenterMode: {
+        if (!Config.ready)
+            return false;
+        return Config.options.search.positionStyle === "center";
+    }
+
     readonly property bool searchConnectActive: {
         if (!connectModeActive)
+            return false;
+        if (root.searchCenterMode)
             return false;
         if (Config.options.search.connectStyle !== "connect")
             return false;
 
         // All corner styles supported
+        return true;
+    }
+
+    // The floating Dynamic Island is the sole owner of the search surface
+    // while it is enabled. Its PanelWindow chooses the configured target
+    // monitor, so ownership must not depend on the monitor that opened it.
+    readonly property bool floatingNotchOwnsSearch: {
+        if (!Config.ready || !root.overviewOpen)
+            return false;
+
+        const notch = Config.options.bar.floatingNotch;
+        if (!notch || !notch.enable || notch.centerInBar)
+            return false;
+
         return true;
     }
 
@@ -299,7 +499,7 @@ Singleton {
     function enforceSidebarStyle() {
         if (!Config.ready)
             return;
-        if (Config.options.bar.barBackgroundStyle === 0 && Config.options.sidebar.sidebarStyle === "connect") {
+        if (ShellModePolicy.shouldForceDefault) {
             Config.options.sidebar.sidebarStyle = "default";
         }
     }
@@ -327,9 +527,20 @@ Singleton {
         }
     }
 
+    property real _lastPoliciesWidth: Appearance.sizes.sidebarWidth + 300
+
+    onPoliciesWidthChanged: {
+        if (Config.ready && !policiesExtended) {
+            _lastPoliciesWidth = policiesWidth;
+        }
+    }
+
     readonly property real policiesWidth: {
         if (policiesExtended)
             return Appearance.sizes.sidebarWidthExtended;
+
+        if (!Config.ready)
+            return _lastPoliciesWidth;
 
         const p = Config.options.policies;
         let activeCount = 0;
@@ -419,34 +630,51 @@ Singleton {
 
     onLeftSidebarTargetWidthChanged: {
         leftSidebarAnimation.stop();
+        if ((Config.options?.appearance?.animationMultiplier ?? 1.0) <= 0.25) {
+            animatedLeftSidebarWidth = leftSidebarTargetWidth;
+            return;
+        }
         if (leftSidebarTargetWidth > 0) {
             leftSidebarAnimation.duration = Appearance.animation.elementMoveEnter.duration;
             leftSidebarAnimation.easing.type = Easing.OutQuart;
+            leftSidebarAnimation.to = leftSidebarTargetWidth;
+            leftSidebarAnimation.start();
         } else {
             leftSidebarAnimation.duration = Appearance.animation.elementMoveEnter.duration;
             leftSidebarAnimation.easing.type = Easing.OutQuart;
+            leftSidebarAnimation.to = leftSidebarTargetWidth;
+            leftSidebarAnimation.start();
         }
-        leftSidebarAnimation.to = leftSidebarTargetWidth;
-        leftSidebarAnimation.start();
     }
 
     onRightSidebarTargetWidthChanged: {
         rightSidebarAnimation.stop();
+        if ((Config.options?.appearance?.animationMultiplier ?? 1.0) <= 0.25) {
+            animatedRightSidebarWidth = rightSidebarTargetWidth;
+            return;
+        }
         if (rightSidebarTargetWidth > 0) {
             rightSidebarAnimation.duration = Appearance.animation.elementMoveEnter.duration;
             rightSidebarAnimation.easing.type = Easing.OutQuart;
+            rightSidebarAnimation.to = rightSidebarTargetWidth;
+            rightSidebarAnimation.start();
         } else {
             rightSidebarAnimation.duration = Appearance.animation.elementMoveEnter.duration;
             rightSidebarAnimation.easing.type = Easing.OutQuart;
+            rightSidebarAnimation.to = rightSidebarTargetWidth;
+            rightSidebarAnimation.start();
         }
-        rightSidebarAnimation.to = rightSidebarTargetWidth;
-        rightSidebarAnimation.start();
     }
 
     Component.onCompleted: {
         animatedLeftSidebarWidth = leftSidebarTargetWidth;
         animatedRightSidebarWidth = rightSidebarTargetWidth;
         root.enforceSidebarStyle();
+        // Instantiate sidebars immediately on startup on the primary/focused screen to keep them warm
+        Qt.callLater(() => {
+            root.activeLeftSidebarMonitor = Hyprland.focusedMonitor?.name ?? Quickshell.primaryScreen?.name ?? "";
+            root.activeRightSidebarMonitor = Hyprland.focusedMonitor?.name ?? Quickshell.primaryScreen?.name ?? "";
+        });
     }
 
     property bool dashboardPanelOpen: false // formerly sidebarRightOpen
@@ -525,29 +753,32 @@ Singleton {
         root.overviewOpen = true;
     }
 
+    Timer {
+        id: resetSearchOnlyModeTimer
+        interval: 300
+        repeat: false
+        onTriggered: {
+            if (!root.overviewOpen) {
+                root.searchOnlyMode = false;
+            }
+        }
+    }
+
     onOverviewOpenChanged: {
-        if (root.overviewOpen && (root.searchConnectActive || Config.options.bar.floatingNotch.enable) && root.activeSearchMonitor === "") {
-            root.activeSearchMonitor = Hyprland.focusedMonitor?.name ?? "";
-        }
-        if (!root.overviewOpen && (root.searchConnectActive || Config.options.bar.floatingNotch.enable)) {
+        if (root.overviewOpen) {
+            resetSearchOnlyModeTimer.stop();
+            if (root.activeSearchMonitor === "") {
+                root.activeSearchMonitor = Hyprland.focusedMonitor?.name ?? "";
+            }
+        } else {
             root.activeSearchMonitor = "";
-            // Overview.qml's PanelWindow (which resets searchOnlyMode) is inactive in
-            // connect mode — reset it here so the next SUPER press opens the full overview.
-            root.searchOnlyMode = false;
+            resetSearchOnlyModeTimer.start();
         }
     }
 
-    onAnimatedLeftSidebarWidthChanged: {
-        if (animatedLeftSidebarWidth === 0 && !policiesPanelOpen) {
-            root.activeLeftSidebarMonitor = "";
-        }
-    }
+    onAnimatedLeftSidebarWidthChanged: {}
 
-    onAnimatedRightSidebarWidthChanged: {
-        if (animatedRightSidebarWidth === 0 && !dashboardPanelOpen) {
-            root.activeRightSidebarMonitor = "";
-        }
-    }
+    onAnimatedRightSidebarWidthChanged: {}
 
     onPoliciesPanelOpenChanged: {
         if (policiesPanelOpen) {
@@ -661,3 +892,4 @@ Singleton {
         }
     }
 }
+

@@ -10,6 +10,7 @@ import qs.modules.common.functions
 
 Item {
     id: root
+    readonly property string screenName: QsWindow.window?.screen?.name ?? ""
     property bool borderless: Config.options.bar.borderless
     property bool showDate: Config.options.bar.verbose
     property bool vertical: Config.options.bar.vertical
@@ -38,7 +39,7 @@ Item {
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
         onPressed: {
-            GlobalStates.sidebarRightOpen = !GlobalStates.sidebarRightOpen;
+            GlobalStates.toggleRightSidebar(root.screenName);
         }
     }
 
@@ -46,7 +47,7 @@ Item {
         id: pill
         visible: root.isMaterial
         anchors.centerIn: parent
-        anchors.verticalCenterOffset: root.vertical ? 0 : -1
+        anchors.verticalCenterOffset: root.vertical ? 0 : -0
 
         property color pillColor: GlobalStates.sidebarRightOpen 
             ? (mouseArea.containsMouse ? Appearance.colors.colLayer4Hover : "transparent")
@@ -151,7 +152,7 @@ Item {
     Grid {
         id: flow
         anchors.centerIn: parent
-        anchors.verticalCenterOffset: root.vertical ? 0 : -1
+        anchors.verticalCenterOffset: root.vertical ? 0 : 0
         flow: root.vertical ? Grid.TopToBottom : Grid.LeftToRight
         columns: root.vertical ? 1 : Math.max(1, flow.visibleChildren.length)
         spacing: isMaterial ? 6 : 10
@@ -196,6 +197,23 @@ Item {
             ExpressiveIconWrapper {
                 id: netWrapper
                 vertical: root.vertical
+
+                readonly property string fullWifiIcon: {
+                    var sym = Network.materialSymbol;
+                    if (sym.startsWith("android_wifi") || sym.startsWith("wifi") || sym.startsWith("signal_wifi")) return "wifi";
+                    return "";
+                }
+
+                MaterialSymbol {
+                    visible: netWrapper.fullWifiIcon !== ""
+                    width: parent.width
+                    height: parent.height
+                    text: netWrapper.fullWifiIcon
+                    iconSize: Appearance.font.pixelSize.larger
+                    opacity: 0.3
+                    color: netWrapper.toggled ? Appearance.colors.colPrimary : Appearance.colors.colOnLayer0
+                }
+
                 MaterialSymbol {
                     width: parent.width
                     height: parent.height
@@ -217,6 +235,35 @@ Item {
                     text: BluetoothStatus.connected ? "bluetooth_connected" : BluetoothStatus.enabled ? "bluetooth" : "bluetooth_disabled"
                     iconSize: Appearance.font.pixelSize.larger
                     color: btWrapper.toggled ? Appearance.colors.colPrimary : Appearance.colors.colOnLayer0
+                }
+            }
+        }
+        Revealer {
+            reveal: Config.options.bar.dashboardButton.showVpn && VpnService.active
+            vertical: root.vertical
+            ExpressiveIconWrapper {
+                id: vpnWrapper
+                vertical: root.vertical
+                MaterialSymbol {
+                    anchors.centerIn: parent
+                    text: "key"
+                    iconSize: Appearance.font.pixelSize.larger
+                    color: vpnWrapper.toggled ? Appearance.colors.colPrimary : Appearance.colors.colOnLayer0
+                }
+            }
+        }
+        Revealer {
+            reveal: Config.options.bar.dashboardButton.showTailscale && TailscaleService.active
+            vertical: root.vertical
+            ExpressiveIconWrapper {
+                id: tailscaleWrapper
+                vertical: root.vertical
+                MaterialSymbol {
+                    anchors.centerIn: parent
+                    text: "hub"
+                    iconSize: Appearance.font.pixelSize.normal
+                    fill: 1
+                    color: tailscaleWrapper.toggled ? Appearance.colors.colPrimary : Appearance.colors.colOnLayer0
                 }
             }
         }

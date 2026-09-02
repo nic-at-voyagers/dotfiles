@@ -14,11 +14,10 @@ MouseArea {
     property bool vertical: false
     property bool activelyScreenSharing: false
 
-    implicitWidth: vertical ? Appearance.sizes.verticalBarWidth : 40
-    implicitHeight: vertical ? 40 : Appearance.sizes.baseBarHeight
+    visible: activelyScreenSharing
+    implicitWidth: activelyScreenSharing ? (vertical ? Appearance.sizes.verticalBarWidth : 40) : 0
+    implicitHeight: activelyScreenSharing ? (vertical ? 40 : Appearance.sizes.baseBarHeight) : 0
     hoverEnabled: true
-    Component.onCompleted: rootItem.toggleHighlight(true)
-
     Process {
         id: screenShareProc
         running: true
@@ -31,28 +30,39 @@ MouseArea {
         watchChanges: true
         onFileChanged: this.reload()
         onLoaded: {
-            indicator.activelyScreenSharing = !stateFile.text().trim().toLowerCase().includes("none")
+            let txt = stateFile.text().trim()
+            indicator.activelyScreenSharing = txt.length > 0 && txt.toLowerCase() !== "none" && !txt.toLowerCase().includes("none")
             rootItem.toggleVisible(indicator.activelyScreenSharing)
         }
     }
 
-    MaterialSymbol {
-        id: iconIndicator
-        z: 1
-        text: "cast"
-        anchors {
-            top: parent.top
-            bottom: parent.bottom
-            horizontalCenter: parent.horizontalCenter
+    MaterialShape {
+        id: indicatorShape
+        implicitSize: 32
+        shapeString: "Cookie9Sided"
+        color: indicator.containsMouse
+            ? Appearance.colors.colPrimaryContainerHover
+            : Appearance.colors.colPrimaryContainer
+        anchors.centerIn: parent
+
+        Behavior on color {
+            ColorAnimation { duration: 150 }
         }
-        color: Appearance.colors.colOnPrimary
-        font.pixelSize: Appearance.font.pixelSize.huge
+
+        MaterialSymbol {
+            anchors.centerIn: parent
+            text: "cast"
+            iconSize: 20
+            color: Appearance.colors.colOnPrimaryContainer
+        }
     }
 
     StyledPopup {
+        id: sharePopup
         hoverTarget: indicator
         animate: false
         contentItem: HeroCard {
+            startAnim: sharePopup.opened && sharePopup.popupOpenProgress > 0.6
             compactMode: true
             anchors.centerIn: parent
             icon: "cast_connected"

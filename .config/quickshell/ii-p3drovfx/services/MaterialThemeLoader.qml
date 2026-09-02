@@ -16,7 +16,7 @@ Singleton {
     property string filePath: Directories.generatedMaterialThemePath
 
     function reapplyTheme() {
-        themeFileView.reload()
+        themeFileView.reload();
     }
 
     function applyColors(fileContent) {
@@ -25,21 +25,37 @@ Singleton {
                 console.log("[MaterialThemeLoader] applyColors: empty content, skipping")
                 return;
             }
+
             const json = JSON.parse(fileContent)
+            const skip = { "darkmode": true, "transparent": true }
             for (const key in json) {
-                if (json.hasOwnProperty(key)) {
-                    // Convert snake_case to CamelCase
-                    const camelCaseKey = key.replace(/_([a-z])/g, (g) => g[1].toUpperCase())
-                    const m3Key = `m3${camelCaseKey}`
-                    Appearance.m3colors[m3Key] = json[key]
+                if (json.hasOwnProperty(key) && !skip[key]) {
+                    Appearance.m3colors[root._toM3Key(key)] = json[key]
                 }
             }
-            
-            Appearance.m3colors.darkmode = (Appearance.m3colors.m3background.hslLightness < 0.5)
+
+            root.updateDarkMode(json)
             console.log("[MaterialThemeLoader] applyColors: darkmode=", Appearance.m3colors.darkmode, "bg=", Appearance.m3colors.m3background)
-        } catch(e) {
+        } catch (e) {
             console.log("[MaterialThemeLoader] Error parsing colors.json:", e)
         }
+    }
+
+    function updateDarkMode(json) {
+        if (typeof json.darkmode === "boolean") {
+            Appearance.m3colors.darkmode = json.darkmode;
+            return;
+        }
+
+        const background = json.background ?? json.surface;
+        if (background !== undefined && background !== null && background !== "") {
+            Appearance.m3colors.darkmode = Qt.color(background).hslLightness < 0.5;
+        }
+    }
+
+    function _toM3Key(key) {
+        const camelCaseKey = key.replace(/_([a-z])/g, (g) => g[1].toUpperCase())
+        return `m3${camelCaseKey}`
     }
 
     property int retryCount: 0
@@ -88,22 +104,21 @@ Singleton {
         }
     }
 
-	FileView { 
+    FileView {
         id: themeFileView
         path: Qt.resolvedUrl(root.filePath)
         watchChanges: true
         onFileChanged: {
             console.log("[MaterialThemeLoader] onFileChanged triggered, reloading...")
-            this.reload()
-            delayedFileRead.start()
+            this.reload();
+            delayedFileRead.restart();
         }
         onLoadedChanged: {
             console.log("[MaterialThemeLoader] onLoadedChanged, loaded=", themeFileView.loaded)
             if (themeFileView.loaded) {
                 root.retryCount = 0
                 retryTimer.stop()
-                const fileContent = themeFileView.text()
-                root.applyColors(fileContent)
+                root.applyColors(themeFileView.text())
             }
         }
         onLoadFailed: {
@@ -114,7 +129,22 @@ Singleton {
 
     function toggleLightDark() {
         const currentlyDark = Appearance.m3colors.darkmode;
-        Quickshell.execDetached([Directories.wallpaperSwitchScriptPath, "--mode", currentlyDark ? "light" : "dark", "--noswitch"]);
+        if (Config.options?.background?.useSeparateLightModeWallpaper) {
+            if (currentlyDark) {
+                const lightPath = Config.options.background.lightModeWallpaperPath;
+                if (lightPath && lightPath !== "") {
+                    Wallpapers.applyLightModeWallpaper(lightPath);
+                    return;
+                }
+            } else {
+                const darkPath = Config.options.background.wallpaperPath;
+                if (darkPath && darkPath !== "") {
+                    Wallpapers.apply(darkPath, true);
+                    return;
+                }
+            }
+        }
+        Quickshell.execDetached(["bash", "-c", `env -u LD_LIBRARY_PATH -u PYTHONHOME -u PYTHONPATH PATH=$HOME/.local/bin:$HOME/.cargo/bin:$PATH "${Directories.wallpaperSwitchScriptPath}" --mode ${currentlyDark ? "light" : "dark"} --noswitch`]);
     }
 
     GlobalShortcut {

@@ -30,9 +30,23 @@ AbstractQuickPanel {
                 root.openBluetoothDialog();
             }
         }
+        VpnToggle {
+            altAction: () => {
+                root.openVpnDialog();
+            }
+        }
+        TailscaleToggle {
+            altAction: () => {
+                root.openTailscaleDialog();
+            }
+        }
         NightLight {}
         GameMode {}
-        IdleInhibitor {}
+        IdleInhibitor {
+            altAction: () => {
+                root.openIdleInhibitorDialog();
+            }
+        }
         EasyEffectsToggle {}
         CloudflareWarp {}
         KeyboardBacklight {}

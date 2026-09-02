@@ -21,6 +21,7 @@ Singleton {
     readonly property string music: StandardPaths.standardLocations(StandardPaths.MusicLocation)[0] || ""
     readonly property string videos: StandardPaths.standardLocations(StandardPaths.MoviesLocation)[0] || ""
 
+    readonly property string losslessCutDesktopPath: FileUtils.trimFileProtocol(`${Directories.home}/.local/share/applications/losslesscut.desktop`)
 
     readonly property string cliPath: FileUtils.trimFileProtocol(`${Directories.home}/.local/bin/vynx`)
 
@@ -36,7 +37,7 @@ Singleton {
 
     // Other dirs used by the shell, without "file://"
     property string assetsPath: Quickshell.shellPath("assets")
-    property string scriptPath: Quickshell.shellPath("scripts")
+    property string scriptPath: FileUtils.trimFileProtocol(Quickshell.shellPath("scripts"))
     property string favicons: FileUtils.trimFileProtocol(`${Directories.cache}/media/favicons`)
     property string coverArt: FileUtils.trimFileProtocol(`${Directories.cache}/media/coverart`)
     property string tempImages: `/tmp/quickshell-${SystemInfo.username}/media/images`
@@ -49,17 +50,25 @@ Singleton {
     property string shellConfigPath: `${Directories.shellConfig}/${Directories.shellConfigName}`
     property string todoPath: FileUtils.trimFileProtocol(`${Directories.state}/user/todo.json`)
     property string appUsagePath: FileUtils.trimFileProtocol(`${Directories.state}/user/app_usage.json`)
+    // One file per local day, written by the app_stats sampler.
+    property string appStats: FileUtils.trimFileProtocol(`${Directories.state}/user/app_stats`)
     property string commandsPath: FileUtils.trimFileProtocol(`${Directories.state}/user/commands.json`)
     property string notesPath: FileUtils.trimFileProtocol(`${Directories.state}/user/notes.json`)
     property string conflictCachePath: FileUtils.trimFileProtocol(`${Directories.cache}/conflict-killer`)
     property string notificationsPath: FileUtils.trimFileProtocol(`${Directories.cache}/notifications/notifications.json`)
     property string lyricsPath: FileUtils.trimFileProtocol(`${Directories.cache}/lyrics/lyrics.json`)
     property string generatedMaterialThemePath: FileUtils.trimFileProtocol(`${Directories.state}/user/generated/colors.json`)
+    property string wallpaperPreviewColorsPath: FileUtils.trimFileProtocol(`${Directories.state}/user/generated/wallpaper_preview_colors.json`)
+    property string lockscreenColorsPath: FileUtils.trimFileProtocol(`${Directories.state}/user/generated/lockscreen_colors.json`)
+    property string desktopColorsBackupPath: FileUtils.trimFileProtocol(`${Directories.state}/user/generated/desktop_colors.json`)
+    property string generateLockscreenColorsScriptPath: FileUtils.trimFileProtocol(`${Directories.scriptPath}/colors/generate-lockscreen-colors.sh`)
+    property string gammaControlScriptPath: FileUtils.trimFileProtocol(`${Directories.scriptPath}/brightness/ii-gamma-control`)
+    property string swapLockscreenColorsScriptPath: FileUtils.trimFileProtocol(`${Directories.scriptPath}/colors/swap-lockscreen-colors.sh`)
     property string generatedWallpaperCategoryPath: FileUtils.trimFileProtocol(`${Directories.state}/user/generated/wallpaper/category.txt`)
     property string cliphistDecode: FileUtils.trimFileProtocol(`/tmp/quickshell-${SystemInfo.username}/media/cliphist`)
     property string screenshotTemp: `/tmp/quickshell-${SystemInfo.username}/media/screenshot`
     property string wallpaperSwitchScriptPath: FileUtils.trimFileProtocol(
-        `${Directories.scriptPath}/colors/${(Config.options.appearance.colorEngine ?? "vynx") === "fork" ? "switchwall" : "switchwall_vynx"}.sh`
+        `${Directories.scriptPath}/colors/${(Config.options.appearance.colorEngine ?? "vynx") === "fork" ? "switchwall_vynx" : "switchwall"}.sh`
     )
     property string defaultAiPrompts: Quickshell.shellPath("defaults/ai/prompts")
     property string defaultThemes: Quickshell.shellPath("defaults/themes")
@@ -78,7 +87,14 @@ Singleton {
     property string screenshareStateScript: FileUtils.trimFileProtocol(`${Directories.scriptPath}/screenShare/screensharestate.sh`)
     property string screenshareStatePath: FileUtils.trimFileProtocol(`${Directories.state}/user/generated/screenshare/apps.txt`)
     property string geniusLyricsScriptPath: FileUtils.trimFileProtocol(`${Directories.scriptPath}/lyrics/genius-lyrics.js`)
+    property string ytmusicLyricsScriptPath: FileUtils.trimFileProtocol(`${Directories.scriptPath}/lyrics/ytmusic-lyrics-wrapper.sh`)
     property string localSendDownloadPath: FileUtils.trimFileProtocol(`${Directories.home}/Downloads/localsend`)
+    // Widget extensions
+    property string userWidgetsPath: FileUtils.trimFileProtocol(`${Directories.config}/quickshell/ii/user_widgets`)
+    property string widgetExtensionsPath: `${Directories.shellConfig}/widget_extensions.json`
+    property string widgetBackupsPath: FileUtils.trimFileProtocol(`${Directories.config}/quickshell/ii/user_widgets/.backups`)
+    property string userProfileImagePath: FileUtils.trimFileProtocol(`${Directories.shellConfig}/profile.png`)
+
     // Cleanup on init
     Component.onCompleted: {
         Quickshell.execDetached(["mkdir", "-p", `${shellConfig}`]);
@@ -88,7 +104,9 @@ Singleton {
         Quickshell.execDetached(["bash", "-c", `rm -rf '${latexOutput}'; mkdir -p '${latexOutput}'`]);
         Quickshell.execDetached(["bash", "-c", `rm -rf '${cliphistDecode}'; mkdir -p '${cliphistDecode}'`]);
         Quickshell.execDetached(["mkdir", "-p", `${aiChats}`]);
+        Quickshell.execDetached(["mkdir", "-p", `${appStats}`]);
         Quickshell.execDetached(["mkdir", "-p", `${userActions}`]);
+        Quickshell.execDetached(["mkdir", "-p", `${userWidgetsPath}`]);
         Quickshell.execDetached(["rm", "-rf", `${tempImages}`]);
     }
 }

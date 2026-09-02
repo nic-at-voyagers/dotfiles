@@ -23,13 +23,17 @@ Item {
     property int delegateIndex: -1
 
     readonly property real buttonSize: Appearance.sizes.dockButtonSize
-    readonly property real dotMargin: (Config.options?.dock.height ?? 60) * 0.2
-    readonly property real slotSize: buttonSize + dotMargin * 2
+    readonly property real dotMargin: root.dockContent?.dotMargin ?? Math.max(1, Math.round((Config.options?.dock.height ?? 60) * 0.2) - 2)
+    readonly property real dotMarginV: root.dockContent?.dotMarginV ?? root.dotMargin
+    readonly property real slotSize: root.dockContent?.buttonSlotSize ?? (buttonSize + dotMargin * 2)
+    readonly property real slotHeight: root.dockContent
+        ? (root.isVertical ? root.dockContent.buttonSlotSize : root.dockContent.buttonSlotHeight)
+        : (buttonSize + dotMarginV * 2)
     readonly property real fixedSlots: isVertical ? 2.5 : 3
     readonly property real fixedLength: fixedSlots * slotSize
 
     implicitWidth: root.isVertical ? root.slotSize : root.fixedLength
-    implicitHeight: root.isVertical ? root.slotSize : root.slotSize
+    implicitHeight: root.isVertical ? root.slotSize : root.slotHeight
 
     readonly property MprisPlayer currentPlayer: MprisController.activePlayer
     readonly property bool isPlaying: currentPlayer?.isPlaying ?? false
@@ -97,7 +101,7 @@ Item {
 
     readonly property int elementHeight: Math.max(20, Math.min(42, root.height - 10))
     readonly property int barWidth: Math.max(4, Math.min(8, root.elementHeight / 5))
-    property var visualizerPoints: []
+    property var visualizerPoints: CavaService.visualizerPoints
 
     readonly property real bar0Val: visualizerPoints.length > 5 ? visualizerPoints[3] / 1000.0 : 0
     readonly property real bar1Val: visualizerPoints.length > 11 ? visualizerPoints[9] / 1000.0 : 0
@@ -308,17 +312,7 @@ Item {
         }
     }
 
-    Process {
-        id: cavaProc
-        running: root.isPlaying
-        command: ["cava", "-p", `${FileUtils.trimFileProtocol(Directories.scriptPath)}/cava/raw_output_config.txt`]
-        stdout: SplitParser {
-            onRead: data => {
-                let points = data.split(";").map(p => parseFloat(p.trim())).filter(p => !isNaN(p));
-                root.visualizerPoints = points;
-            }
-        }
-    }
+
 
     Component.onCompleted: {
         root.displayTitle = root.title;
@@ -330,12 +324,15 @@ Item {
     Item {
         id: contentRoot
         anchors.fill: parent
-        anchors.margins: root.dotMargin
+        anchors.leftMargin: root.dotMargin
+        anchors.rightMargin: root.dotMargin
+        anchors.topMargin: root.dotMarginV
+        anchors.bottomMargin: root.dotMarginV
 
         Rectangle {
             id: maskRect
             anchors.fill: parent
-            radius: Appearance.rounding.windowRounding
+            radius: (Config.options?.dock?.widgetRadius ?? -1) >= 0 ? Config.options.dock.widgetRadius : (Appearance.rounding.windowRounding + 12)
             visible: false
         }
 
@@ -577,7 +574,7 @@ Item {
         }
 
         Loader {
-            active: root.isVertical
+            active: false
             anchors.fill: parent
             sourceComponent: Item {
                 anchors.fill: parent
@@ -657,8 +654,16 @@ Item {
         property bool dragActive: false
         property bool mediaHovered: false
 
-        onEntered: mediaHovered = true
-        onExited: mediaHovered = false
+        onEntered: {
+            mediaHovered = true;
+            if (root.dockContent)
+                root.dockContent.onButtonEntered(root);
+        }
+        onExited: {
+            mediaHovered = false;
+            if (root.dockContent)
+                root.dockContent.onButtonExited(root);
+        }
 
         onPressed: (event) => {
             if (event.button === Qt.LeftButton) {
