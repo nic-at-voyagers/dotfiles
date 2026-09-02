@@ -29,8 +29,8 @@ hl.config({
         rounding = 0,
 
         blur = {
-            enabled = false,
-            xray = true,
+            enabled = true,
+            xray = false,
             special = false,
             new_optimizations = true,
             size = 10,

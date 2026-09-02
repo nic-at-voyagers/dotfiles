@@ -45,3 +45,4 @@ for i = 1, 4 do
         { description = "Window: Move " .. arrowkey[i] })
 end
 
+hl.bind("SUPER + U", hl.dsp.global("quickshell:usageToggle"), { description = "Shell: Toggle app usage stats" })
