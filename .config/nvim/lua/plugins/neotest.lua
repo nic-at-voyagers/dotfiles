@@ -12,9 +12,9 @@ return { -- This plugin
             opts = {
                   task_list = {
                         direction = "bottom",
-                        min_height = 25,
-                        max_height = 25,
-                        default_detail = 1
+                        min_height = 10,
+                        max_height = 10,
+                        default_detail = 0
                   },
             },
       },

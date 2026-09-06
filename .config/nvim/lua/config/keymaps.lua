@@ -96,3 +96,10 @@ end, { desc = "Set Exception Breakpoints", nowait = true, remap = false })
 
 -- Delete trailing whitespace
 vim.keymap.set('n', '<S-F9>', ':%s/\\s\\+$//<CR>', { noremap = true })
+
+-- Close current split
+vim.keymap.set("n", "<leader>sx", "<cmd>close<CR>", { desc = "Close current split" })
+
+-- tab management
+vim.keymap.set("n", "<Tab>", "<cmd>BufferLineCycleNext<CR>", { desc = "Go to next buffer" })
+vim.keymap.set("n", "<S-Tab>", "<cmd>BufferLineCyclePrev<CR>", { desc = "Go to previous buffer" })
