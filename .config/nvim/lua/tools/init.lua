@@ -37,6 +37,11 @@ function M.setup()
 		require("salar.tools.skeleton").insert()
 	end, {})
 
+	-- :CSkel command
+	vim.api.nvim_create_user_command("CSkel", function()
+		require("salar.tools.c_skeleton").insert()
+	end, {})
+
 	-- :TypstPreview command
 	vim.api.nvim_create_user_command("TypstPreview", function()
 		local file = vim.fn.expand("%")
@@ -47,6 +52,8 @@ function M.setup()
 
 	require("salar.tools.cpp_extract").setup()
 	require("salar.tools.cpp_trivial_constructor").setup()
+	require("salar.tools.c_extract").setup()
+	require("salar.tools.c_struct_init").setup()
 end
 
 return M
