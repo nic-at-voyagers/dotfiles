@@ -1,7 +1,7 @@
 local M = {}
 
 function M.setup()
-	local group = vim.api.nvim_create_augroup("SalarIncludeFormatter", { clear = true })
+	local group = vim.api.nvim_create_augroup("IncludeFormatter", { clear = true })
 
 	-- C/C++ include formatter
 	vim.api.nvim_create_autocmd("BufWritePre", {
@@ -10,7 +10,7 @@ function M.setup()
 		callback = function(args)
 			local ft = vim.bo[args.buf].filetype
 			if ft == "typst" then return end
-			require("salar.tools.include_formatter").format(args.buf)
+			require("tools.include_formatter").format(args.buf)
 		end,
 	})
 
@@ -34,12 +34,7 @@ function M.setup()
 
 	-- :Skel command
 	vim.api.nvim_create_user_command("Skel", function()
-		require("salar.tools.skeleton").insert()
-	end, {})
-
-	-- :CSkel command
-	vim.api.nvim_create_user_command("CSkel", function()
-		require("salar.tools.c_skeleton").insert()
+		require("tools.skeleton").insert()
 	end, {})
 
 	-- :TypstPreview command
@@ -50,10 +45,8 @@ function M.setup()
 	end, {})
 
 
-	require("salar.tools.cpp_extract").setup()
-	require("salar.tools.cpp_trivial_constructor").setup()
-	require("salar.tools.c_extract").setup()
-	require("salar.tools.c_struct_init").setup()
+	require("tools.cpp_extract").setup()
+	require("tools.cpp_trivial_constructor").setup()
 end
 
 return M
