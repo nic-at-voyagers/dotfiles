@@ -4,7 +4,7 @@
 vim.opt.relativenumber = false
 vim.g.lazyvim_cmp = "blink.cmp"
 vim.g.autoformat = false
-vim.opt.tabstop = 6
-vim.opt.shiftwidth = 6
-vim.opt.expandtab = true
+vim.opt.tabstop = 8
+vim.opt.shiftwidth = 8
+vim.opt.expandtab = false
 vim.g.lazyvim_python_lsp = "basedpyright"
