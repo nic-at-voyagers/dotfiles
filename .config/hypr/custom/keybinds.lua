@@ -46,3 +46,4 @@ for i = 1, 4 do
 end
 
 hl.bind("SUPER + U", hl.dsp.global("quickshell:usageToggle"), { description = "Shell: Toggle app usage stats" })
+hl.bind("SUPER + BracketLeft", hl.dsp.exec_cmd("loginctl lock-session"), { description = "Session: Lock" })

@@ -92,7 +92,7 @@ hl.config({
             input_methods_ignorealpha = 0.8
         },
         shadow = {
-            enabled = true,
+            enabled = false,
             range = 20,
             offset = {0, 2},
             render_power = 10,
