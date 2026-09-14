@@ -22,7 +22,7 @@ QuickToggleModel {
                 "decoration:blur:enabled": 0,
                 "general:gaps_in": 0,
                 "general:gaps_out": 0,
-                "general:border_size": 1,
+                "general:border_size": 4,
                 "decoration:rounding": 0,
 								"decoration:rounding_power": 0,
                 "general:allow_tearing": 1

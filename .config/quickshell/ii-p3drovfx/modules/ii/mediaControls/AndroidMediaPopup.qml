@@ -212,9 +212,9 @@ Item {
                 source: root.artSource
                 fillMode: Image.PreserveAspectCrop
                 visible: root.artSource !== ""
-                layer.enabled: root.artVignetteBlur > 0
+                layer.enabled: root.artVignetteBlur > 1
                 layer.effect: MultiEffect {
-                    blurEnabled: root.artVignetteBlur > 0
+                    blurEnabled: root.artVignetteBlur > 1
                     blurMax: 128
                     blur: root.artVignetteBlur / 128
                 }
