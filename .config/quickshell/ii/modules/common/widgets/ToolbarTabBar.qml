@@ -21,8 +21,6 @@ Item {
         tabBar.setCurrentIndex(index);
     }
 
-    property int maxTextTabs: 99
-
     Layout.alignment: Qt.AlignHCenter | Qt.AlignVCenter
     implicitWidth: contentItem.implicitWidth
     implicitHeight: 40
@@ -31,7 +29,6 @@ Item {
         required property int index
         required property var modelData
         current: index == root.currentIndex
-        showLabel: root.tabButtonList.length <= root.maxTextTabs || current
         text: modelData.name
         materialSymbol: modelData.icon
         onClicked: {
@@ -57,21 +54,20 @@ Item {
         color: Appearance.colors.colSecondaryContainer
         implicitWidth: contentItem.children[root.currentIndex]?.implicitWidth ?? 0
         implicitHeight: contentItem.children[root.currentIndex]?.implicitHeight ?? 0
-        readonly property int fullRadius: Config.options.appearance.sharpMode ? Appearance.rounding.full : height / 2
-        radius: fullRadius
+        radius: height / 2
         // Animation
-        property Item targetItem: contentItem.children[root.currentIndex] || null
+        property Item targetItem: contentItem.children[root.currentIndex]
         AnimatedTabIndexPair {
             id: leftBound
             idx1Duration: 50
             idx2Duration: 200
-            index: activeIndicator.targetItem ? activeIndicator.targetItem.x : 0
+            index: activeIndicator.targetItem.x
         }
         AnimatedTabIndexPair {
             id: rightBound
             idx1Duration: 50
             idx2Duration: 200
-            index: activeIndicator.targetItem ? activeIndicator.targetItem.x + activeIndicator.targetItem.width : 0
+            index: activeIndicator.targetItem.x + activeIndicator.targetItem.width
         }
         x: Math.min(leftBound.idx1, leftBound.idx2)
         width: Math.max(rightBound.idx1, rightBound.idx2) - x

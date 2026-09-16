@@ -17,8 +17,6 @@ Item {
 
     readonly property string clockStyle: Config.options.background.widgets.clock.style
 
-    property bool isCovered: false
-
     property real implicitSize: 230
 
     property color colShadow: Appearance.colors.colShadow
@@ -72,24 +70,20 @@ Item {
         id: categoryFileView
         path: Config.ready ? Directories.generatedWallpaperCategoryPath : ""
         watchChanges: true
-        onFileChanged: this.reload()
+        onFileChanged: reload()
         onLoaded: {
             root.setClockPreset(categoryFileView.text().trim())
         }
     }
 
-    property string backgroundStyle: Config.options.background.widgets.clock.cookie.backgroundStyle
+    property bool useSineCookie: Config.options.background.widgets.clock.cookie.useSineCookie
     StyledDropShadow {
-        id: shadowItem
-        target: backgroundStyle === "sine" ? sineCookieLoader : backgroundStyle === "shape" ? materialShapeCookieLoader : roundedPolygonCookieLoader
+        target: root.useSineCookie ? sineCookieLoader : roundedPolygonCookieLoader
 
-        RotationAnimation {
-            id: rotateAnim
-            target: shadowItem
-            property: "rotation"
+        RotationAnimation on rotation {
             running: Config.options.background.widgets.clock.cookie.constantlyRotate
-            paused: Config.options.background.widgets.clock.cookie.turnOffRotationOnTiledApps && root.isCovered
             duration: 30000
+            easing.type: Easing.Linear
             loops: Animation.Infinite
             from: 360
             to: 0
@@ -99,7 +93,7 @@ Item {
         id: sineCookieLoader
         z: 0
         visible: false // The DropShadow already draws it
-        active: backgroundStyle === "sine"
+        active: root.useSineCookie
         sourceComponent: SineCookie {
             implicitSize: root.implicitSize
             sides: Config.options.background.widgets.clock.cookie.sides
@@ -110,22 +104,11 @@ Item {
         id: roundedPolygonCookieLoader
         z: 0
         visible: false // The DropShadow already draws it
-        active: backgroundStyle === "cookie"
+        active: !root.useSineCookie
         sourceComponent: MaterialCookie {
             implicitSize: root.implicitSize
             sides: Config.options.background.widgets.clock.cookie.sides
             color: root.colBackground
-        }
-    }
-    Loader {
-        id: materialShapeCookieLoader
-        z: 0
-        visible: false // The DropShadow already draws it
-        active: backgroundStyle === "shape"
-        sourceComponent: MaterialShape {
-            implicitSize: root.implicitSize
-            color: root.colBackground
-            shapeString: Config.options.background.widgets.clock.cookie.backgroundShape
         }
     }
 
@@ -199,7 +182,6 @@ Item {
             clockSecond: root.clockSecond
             style: Config.options.background.widgets.clock.cookie.secondHandStyle
             color: root.colSecondHand
-            isCovered: root.isCovered
         }
     }
 

@@ -56,10 +56,7 @@ post_process() {
     local wallpaper_path="$3"
 
     handle_kde_material_you_colors &
-    "$SCRIPT_DIR/code/material-code-set-color.sh"
-
-    # Generate YouTube Music theme
-    "$SCRIPT_DIR/../ytmusic/generate-ytmusic-theme.sh" > /dev/null 2>&1 &
+    "$SCRIPT_DIR/code/material-code-set-color.sh" &
 }
 
 check_and_prompt_upscale() {
@@ -147,63 +144,21 @@ EOF
 set_wallpaper_path() {
     local path="$1"
     if [ -f "$SHELL_CONFIG_FILE" ]; then
-        jq --indent 4 --arg path "$path" '.background.wallpaperPath = $path' "$SHELL_CONFIG_FILE" > "$SHELL_CONFIG_FILE.tmp" && mv "$SHELL_CONFIG_FILE.tmp" "$SHELL_CONFIG_FILE"
+        jq --arg path "$path" '.background.wallpaperPath = $path' "$SHELL_CONFIG_FILE" > "$SHELL_CONFIG_FILE.tmp" && mv "$SHELL_CONFIG_FILE.tmp" "$SHELL_CONFIG_FILE"
     fi
 }
 
 set_thumbnail_path() {
     local path="$1"
     if [ -f "$SHELL_CONFIG_FILE" ]; then
-        jq --indent 4 --arg path "$path" '.background.thumbnailPath = $path' "$SHELL_CONFIG_FILE" > "$SHELL_CONFIG_FILE.tmp" && mv "$SHELL_CONFIG_FILE.tmp" "$SHELL_CONFIG_FILE"
+        jq --arg path "$path" '.background.thumbnailPath = $path' "$SHELL_CONFIG_FILE" > "$SHELL_CONFIG_FILE.tmp" && mv "$SHELL_CONFIG_FILE.tmp" "$SHELL_CONFIG_FILE"
     fi
 }
 
 categorize_wallpaper() {
-    local target_payload="$1"
-
-    if [[ -z "$ai_script" || ! -f "$target_payload" ]]; then
-        return
-    fi
-
-    local wallpaper_name=$(basename "$imgpath")
-    local cache_file="$CACHE_DIR/ai-categories/$wallpaper_name.txt"
-  
-    if [ -f "$cache_file" ]; then
-    #Cache hit :) sleep for 300ms to allow the script to finish before changing clock theme
-        (
-            sleep 0.3 
-            cat "$cache_file" >"$STATE_DIR/user/generated/wallpaper/category.txt"
-        ) &
-    else
-        # Cache Miss :(
-        mkdir -p "$CACHE_DIR/ai-categories"
-        (
-            local tmp_output="/tmp/quickshell/ai/cat_verify_${wallpaper_name}.txt"
-            mkdir -p "$(dirname "$tmp_output")"
-
-            "$ai_script" "$target_payload" >"$tmp_output" 2>"$STATE_DIR/user/generated/wallpaper/ai_error.log"
-
-            # checking the output because sometimes we get garbage for some reason
-            local clean_res=$(cat "$tmp_output" | tr -d '"' | xargs | tr '[:upper:]' '[:lower:]')
-            local valid_categories=("abstract" "anime" "city" "minimalist" "landscape" "plants" "person" "space")
-            local api_success=0
-
-            for cat in "${valid_categories[@]}"; do
-                if [[ "$clean_res" == "$cat" ]]; then
-                    api_success=1
-                    break
-                fi
-            done
-
-            if [[ $api_success -eq 1 ]]; then
-                mv "$tmp_output" "$cache_file"
-                cat "$cache_file" >"$STATE_DIR/user/generated/wallpaper/category.txt"
-            else
-                rm -f "$tmp_output"
-                echo "API Failure: Invalid output structure received ($clean_res)" >>"$STATE_DIR/user/generated/wallpaper/ai_error.log"
-            fi
-        ) &
-    fi
+    img_cat=$("$SCRIPT_DIR/../ai/gemini-categorize-wallpaper.sh" "$1")
+    # notify-send "Wallpaper category" "$img_cat"
+    echo "$img_cat" > "$STATE_DIR/user/generated/wallpaper/category.txt"
 }
 
 switch() {
@@ -212,19 +167,11 @@ switch() {
     type_flag="$3"
     color_flag="$4"
     color="$5"
-    theme_file="$6"
 
     # Start Gemini auto-categorization if enabled
     aiStylingEnabled=$(jq -r '.background.widgets.clock.cookie.aiStyling' "$SHELL_CONFIG_FILE")
-    aiStylingModel=$(jq -r '.background.widgets.clock.cookie.aiStylingModel' "$SHELL_CONFIG_FILE")
-    ai_script=""
-
     if [[ "$aiStylingEnabled" == "true" ]]; then
-        if [[ "$aiStylingModel" == "gemini" ]]; then  
-            ai_script="$SCRIPT_DIR/../ai/gemini-categorize-wallpaper.sh"
-        elif [[ "$aiStylingModel" == "openrouter" ]]; then  
-            ai_script="$SCRIPT_DIR/../ai/openrouter-categorize-wallpaper.sh"
-        fi
+        categorize_wallpaper "$imgpath" &
     fi
 
     read scale screenx screeny screensizey < <(hyprctl monitors -j | jq '.[] | select(.focused) | .scale, .x, .y, .height' | xargs)
@@ -283,7 +230,7 @@ switch() {
             local video_path="$imgpath"
             monitors=$(hyprctl monitors -j | jq -r '.[] | .name')
             for monitor in $monitors; do
-                nohup mpvpaper -o "$VIDEO_OPTS" "$monitor" "$video_path" >/dev/null 2>&1 &
+                mpvpaper -o "$VIDEO_OPTS" "$monitor" "$video_path" &
                 sleep 0.1
             done
 
@@ -298,8 +245,6 @@ switch() {
                 matugen_args+=(image "$thumbnail")
                 generate_colors_material_args=(--path "$thumbnail")
                 create_restore_script "$video_path"
-
-                categorize_wallpaper "$thumbnail"
             else
                 echo "Cannot create image to colorgen"
                 remove_restore
@@ -311,8 +256,6 @@ switch() {
             # Update wallpaper path in config
             set_wallpaper_path "$imgpath"
             remove_restore
-
-            categorize_wallpaper "$imgpath"
         fi
     fi
 
@@ -360,18 +303,12 @@ switch() {
         [[ "$term_fg_boost" != "null" && -n "$term_fg_boost" ]] && generate_colors_material_args+=(--term_fg_boost "$term_fg_boost")
     fi
 
-    if [[ -n "$theme_file" ]]; then
-        mkdir -p "$(dirname "$STATE_DIR/user/generated/colors.json")"
-        cp "$theme_file" "$STATE_DIR/user/generated/colors.json"
-        echo "[switchwall.sh] Applied theme: $type_flag"
-    else
-        matugen "${matugen_args[@]}"
-        source "$(eval echo $ILLOGICAL_IMPULSE_VIRTUAL_ENV)/bin/activate"
-        python3 "$SCRIPT_DIR/generate_colors_material.py" "${generate_colors_material_args[@]}" \
-            > "$STATE_DIR"/user/generated/material_colors.scss
-        deactivate
-        "$SCRIPT_DIR"/applycolor.sh
-    fi
+    matugen "${matugen_args[@]}"
+    source "$(eval echo $ILLOGICAL_IMPULSE_VIRTUAL_ENV)/bin/activate"
+    python3 "$SCRIPT_DIR/generate_colors_material.py" "${generate_colors_material_args[@]}" \
+        > "$STATE_DIR"/user/generated/material_colors.scss
+    deactivate
+    "$SCRIPT_DIR"/applycolor.sh
 
     # Pass screen width, height, and wallpaper path to post_process
     max_width_desired="$(hyprctl monitors -j | jq '([.[].width] | min)' | xargs)"
@@ -395,7 +332,7 @@ main() {
     }
     set_accent_color() {
         local color="$1"
-        jq --indent 4 --arg color "$color" '.appearance.palette.accentColor = $color' "$SHELL_CONFIG_FILE" > "$SHELL_CONFIG_FILE.tmp" && mv "$SHELL_CONFIG_FILE.tmp" "$SHELL_CONFIG_FILE"
+        jq --arg color "$color" '.appearance.palette.accentColor = $color' "$SHELL_CONFIG_FILE" > "$SHELL_CONFIG_FILE.tmp" && mv "$SHELL_CONFIG_FILE.tmp" "$SHELL_CONFIG_FILE"
     }
 
     detect_scheme_type_from_image() {
@@ -466,23 +403,9 @@ main() {
             break
         fi
     done
-
-    # If type is not a standard scheme variant, check if it's a built-in or custom theme file
-    theme_file=""
     if [[ $valid_type -eq 0 ]]; then
-        builtin_theme="$SCRIPT_DIR/../../defaults/themes/${type_flag}.json"
-        custom_theme="$(dirname "$SHELL_CONFIG_FILE")/themes/${type_flag}.json"
-        if [[ -f "$builtin_theme" ]]; then
-            theme_file="$builtin_theme"
-            valid_type=1
-        elif [[ -f "$custom_theme" ]]; then
-            theme_file="$custom_theme"
-            valid_type=1
-        fi
-        if [[ -z "$theme_file" ]]; then
-            echo "[switchwall.sh] Warning: Invalid type '$type_flag', defaulting to 'auto'" >&2
-            type_flag="auto"
-        fi
+        echo "[switchwall.sh] Warning: Invalid type '$type_flag', defaulting to 'auto'" >&2
+        type_flag="auto"
     fi
 
     # Only prompt for wallpaper if not using --color and not using --noswitch and no imgpath set
@@ -521,7 +444,31 @@ main() {
         fi
     fi
 
-    switch "$imgpath" "$mode_flag" "$type_flag" "$color_flag" "$color" "$theme_file"
+    # If mode_flag is dark or light, try to find a variant with that mode suffix
+    if [[ "$mode_flag" == "dark" || "$mode_flag" == "light" ]]; then
+        # Get directory, filename without extension, and extension
+        local imgdir="$(dirname "$imgpath")"
+        local imgbase="$(basename "$imgpath")"
+        local imgname="${imgbase%.*}"
+        local imgext="${imgbase##*.}"
+
+        # Strip existing -dark or -light suffix
+        local stripped_name="${imgname%-dark}"
+        stripped_name="${stripped_name%-light}"
+
+        # Construct the new path with the requested mode suffix
+        local new_imgpath="${imgdir}/${stripped_name}-${mode_flag}.${imgext}"
+        local new_stripped_imgpath="${imgdir}/${stripped_name}.${imgext}"
+
+        # If the variant exists, use it
+        if [[ -f "$new_imgpath" ]]; then
+            imgpath="$new_imgpath"
+        elif [[ -f "$new_stripped_imgpath" ]]; then
+            imgpath="$new_stripped_imgpath"
+        fi
+    fi
+
+    switch "$imgpath" "$mode_flag" "$type_flag" "$color_flag" "$color"
 }
 
 main "$@"

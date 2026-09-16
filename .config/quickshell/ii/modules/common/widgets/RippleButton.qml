@@ -23,11 +23,6 @@ Button {
     property var altAction // When right clicking
     property var middleClickAction // When middle clicking
 
-    property real topLeftRadius: buttonEffectiveRadius
-    property real topRightRadius: buttonEffectiveRadius
-    property real bottomLeftRadius: buttonEffectiveRadius
-    property real bottomRightRadius: buttonEffectiveRadius
-
     property color colBackground: ColorUtils.transparentize(Appearance?.colors.colLayer1Hover, 1) || "transparent"
     property color colBackgroundHover: Appearance?.colors.colLayer1Hover ?? "#E5DFED"
     property color colBackgroundToggled: Appearance?.colors.colPrimary ?? "#65558F"
@@ -35,21 +30,13 @@ Button {
     property color colRipple: Appearance?.colors.colLayer1Active ?? "#D6CEE2"
     property color colRippleToggled: Appearance?.colors.colPrimaryActive ?? "#D6CEE2"
 
-    Behavior on buttonEffectiveRadius {
-        animation: Appearance?.animation.elementMoveFast.numberAnimation.createObject(this)
-    }
-
     opacity: root.enabled ? 1 : 0.4
     property color buttonColor: ColorUtils.transparentize(root.toggled ? 
         (root.hovered ? colBackgroundToggledHover : 
             colBackgroundToggled) :
         (root.hovered ? colBackgroundHover : 
-            colBackground), root.enabled ? 0 : 0)
+            colBackground), root.enabled ? 0 : 1)
     property color rippleColor: root.toggled ? colRippleToggled : colRipple
-
-    Behavior on opacity {
-        animation: Appearance.animation.elementResize.numberAnimation.createObject(this)
-    }
 
     function startRipple(x, y) {
         const stateY = buttonBackground.y;
@@ -146,10 +133,7 @@ Button {
 
     background: Rectangle {
         id: buttonBackground
-        topLeftRadius: root.topLeftRadius
-        topRightRadius: root.topRightRadius
-        bottomLeftRadius: root.bottomLeftRadius
-        bottomRightRadius: root.bottomRightRadius
+        radius: root.buttonEffectiveRadius
         implicitHeight: 30
 
         color: root.buttonColor
@@ -162,10 +146,7 @@ Button {
             maskSource: Rectangle {
                 width: buttonBackground.width
                 height: buttonBackground.height
-                topLeftRadius: root.topLeftRadius
-                topRightRadius: root.topRightRadius
-                bottomLeftRadius: root.bottomLeftRadius
-                bottomRightRadius: root.bottomRightRadius
+                radius: root.buttonEffectiveRadius
             }
         }
 

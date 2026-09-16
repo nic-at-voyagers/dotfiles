@@ -15,18 +15,13 @@ Scope {
 
     property var action: RegionSelection.SnipAction.Copy
     property var selectionMode: RegionSelection.SelectionMode.RectCorners
-
+    
     Variants {
         model: Quickshell.screens
-        
         delegate: Loader {
             id: regionSelectorLoader
             required property var modelData
-
-            readonly property HyprlandMonitor monitor: Hyprland.monitorFor(regionSelectorLoader.modelData)
-            property bool monitorIsFocused: (Hyprland.focusedMonitor?.id == monitor?.id)
-
-            active: GlobalStates.regionSelectorOpen && (!Config.options.regionSelector.showOnlyOnFocusedMonitor || monitorIsFocused)
+            active: GlobalStates.regionSelectorOpen
 
             sourceComponent: RegionSelection {
                 screen: regionSelectorLoader.modelData

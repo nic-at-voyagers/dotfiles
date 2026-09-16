@@ -106,26 +106,11 @@ RowLayout {
         Layout.bottomMargin: 4
         onClicked: {
             GlobalStates.overviewOpen = false;
-            const overviewAnimationEnabled = Config.options.overview.showOpeningAnimation
-
-            if (!overviewAnimationEnabled) {
-                Quickshell.execDetached(["qs", "-p", Quickshell.shellPath(""), "ipc", "call", "region", "search"]);
-                return
-            }
-            lensDelayTimer.start();
+            Quickshell.execDetached(["qs", "-p", Quickshell.shellPath(""), "ipc", "call", "region", "search"]);
         }
         text: "image_search"
         StyledToolTip {
             text: Translation.tr("Google Lens")
-            y: parent.height + 3
-        }
-    }
-
-    Timer {
-        id: lensDelayTimer
-        interval: 201
-        onTriggered: {
-            Quickshell.execDetached(["qs", "-p", Quickshell.shellPath(""), "ipc", "call", "region", "search"]);
         }
     }
 
@@ -140,7 +125,6 @@ RowLayout {
 
         StyledToolTip {
             text: Translation.tr("Recognize music")
-            y: parent.height + 3
         }
 
         colText: toggled ? Appearance.colors.colOnPrimary : Appearance.colors.colOnSurfaceVariant

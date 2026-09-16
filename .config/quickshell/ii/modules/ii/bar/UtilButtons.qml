@@ -10,24 +10,14 @@ import Quickshell.Services.UPower
 
 Item {
     id: root
-    property bool vertical: false
-    implicitWidth: gridLayout.implicitWidth + gridLayout.rowSpacing * 2
-    implicitHeight: gridLayout.implicitHeight + gridLayout.columnSpacing * 2
-    
-    Behavior on implicitWidth {
-        animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
-    }
-    Behavior on implicitHeight {
-        animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
-    }
+    property bool borderless: Config.options.bar.borderless
+    implicitWidth: rowLayout.implicitWidth + rowLayout.spacing * 2
+    implicitHeight: rowLayout.implicitHeight
 
-    GridLayout {
-        id: gridLayout
-        columns: root.vertical ? 1 : -1
-        rows: root.vertical ? -1 : 1
+    RowLayout {
+        id: rowLayout
 
-        rowSpacing: 4
-        columnSpacing: 4
+        spacing: 4
         anchors.centerIn: parent
 
         Loader {

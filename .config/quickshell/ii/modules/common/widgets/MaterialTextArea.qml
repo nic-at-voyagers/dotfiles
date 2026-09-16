@@ -25,8 +25,8 @@ TextArea {
     background: Rectangle {
         implicitHeight: 56
         color: Appearance.m3colors.m3surface
-        topLeftRadius: Appearance.rounding.unsharpenmore
-        topRightRadius: Appearance.rounding.unsharpenmore
+        topLeftRadius: 4
+        topRightRadius: 4
         Rectangle {
             anchors {
                 left: parent.left

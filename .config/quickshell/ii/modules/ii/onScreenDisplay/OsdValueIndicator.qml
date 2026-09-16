@@ -9,15 +9,14 @@ Item {
     required property real value
     required property string icon
     required property string name
-    property var shape
     property bool rotateIcon: false
     property bool scaleIcon: false
     property alias from: valueProgressBar.from
     property alias to: valueProgressBar.to
 
     property real valueIndicatorVerticalPadding: 9
-    property real valueIndicatorLeftPadding: 15
-    property real valueIndicatorRightPadding: 15 // An icon is circle ish, a column isn't, hence the extra padding
+    property real valueIndicatorLeftPadding: 10
+    property real valueIndicatorRightPadding: 20 // An icon is circle ish, a column isn't, hence the extra padding
 
     implicitWidth: Appearance.sizes.osdWidth + 2 * Appearance.sizes.elevationMargin
     implicitHeight: valueIndicator.implicitHeight + 2 * Appearance.sizes.elevationMargin
@@ -32,7 +31,7 @@ Item {
             margins: Appearance.sizes.elevationMargin
         }
         radius: Appearance.rounding.full
-        color: Appearance.m3colors.m3surfaceContainer
+        color: Appearance.colors.colLayer0
 
         implicitWidth: valueRow.implicitWidth
         implicitHeight: valueRow.implicitHeight
@@ -41,22 +40,35 @@ Item {
             id: valueRow
             Layout.margins: 10
             anchors.fill: parent
-            spacing: 15
+            spacing: 10
 
             Item {
                 implicitWidth: 30
-                implicitHeight: 35
+                implicitHeight: 30
                 Layout.alignment: Qt.AlignVCenter
                 Layout.leftMargin: valueIndicatorLeftPadding
                 Layout.topMargin: valueIndicatorVerticalPadding
                 Layout.bottomMargin: valueIndicatorVerticalPadding
 
-                MaterialShapeWrappedMaterialSymbol {
-                    rotation: root.value * 360
-                    anchors.centerIn: parent
-                    iconSize: Appearance.font.pixelSize.huge
-                    shape: root.shape
+                MaterialSymbol { // Icon
+                    anchors {
+                        centerIn: parent
+                        alignWhenCentered: !root.rotateIcon
+                    }
+                    color: Appearance.colors.colOnLayer0
+                    renderType: Text.QtRendering
+
                     text: root.icon
+                    iconSize: 20 + 10 * (root.scaleIcon ? value : 1)
+                    rotation: 180 * (root.rotateIcon ? value : 0)
+
+                    Behavior on iconSize {
+                        animation: Appearance.animation.elementMoveEnter.numberAnimation.createObject(this)
+                    }
+                    Behavior on rotation {
+                        animation: Appearance.animation.elementMoveEnter.numberAnimation.createObject(this)
+                    }
+                
                 }
             }
             ColumnLayout { // Stuff
@@ -79,8 +91,6 @@ Item {
                         color: Appearance.colors.colOnLayer0
                         font.pixelSize: Appearance.font.pixelSize.small
                         Layout.fillWidth: false
-                        Layout.preferredWidth: 30
-                        horizontalAlignment: Text.AlignRight
                         text: Math.round(root.value * 100)
                     }
                 }

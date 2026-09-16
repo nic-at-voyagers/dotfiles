@@ -19,8 +19,6 @@ import Quickshell.Hyprland
 ShellRoot {
     id: root
 
-    
-
     // Stuff for every panel family
     ReloadPopup {}
 

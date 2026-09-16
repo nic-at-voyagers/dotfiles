@@ -51,7 +51,7 @@ hl.config({
         gaps_out = 15,
         gaps_workspaces = 100,
 
-        border_size = 1,
+        border_size = 4,
 
         col = {
             active_border = "rgba(0DB7D455)",
@@ -71,7 +71,7 @@ hl.config({
     decoration = {
         -- 2 = circle, higher = squircle, 4 = very obvious squircle
         -- Fuck clearly visible squircles. 100% Apple brainrot.
-        rounding_power = 2.5,
+        rounding_power = 0,
         rounding = 18,
 
         blur = {
@@ -114,6 +114,7 @@ hl.config({
         -- precise_mouse_move = true,
     },
 })
+
 -- Curves
 hl.curve("expressiveFastSpatial", { type = "bezier", points = {{0.42, 1.67}, {0.21, 0.90}} })
 hl.curve("expressiveSlowSpatial", { type = "bezier", points = {{0.39, 1.29}, {0.35, 0.98}} })
@@ -140,7 +141,7 @@ hl.animation({ leaf = "layersOut", enabled = true, speed = 3.4, bezier = "menu_a
 hl.animation({ leaf = "fadeLayersIn", enabled = true, speed = 0.5, bezier = "menu_decel" })
 hl.animation({ leaf = "fadeLayersOut", enabled = true, speed = 2.7, bezier = "stall" })
 -- workspaces
-hl.animation({ leaf = "workspaces", enabled = true, speed = 5, bezier = "menu_decel", style = "slide" })
+hl.animation({ leaf = "workspaces", enabled = true, speed = 6, bezier = "menu_decel", style = "slide" })
 -- specialWorkspace
 hl.animation({ leaf = "specialWorkspaceIn", enabled = true, speed = 2.8, bezier = "emphasizedDecel", style = "slidevert" })
 hl.animation({ leaf = "specialWorkspaceOut", enabled = true, speed = 1.2, bezier = "emphasizedAccel", style = "slidevert" })
@@ -151,8 +152,8 @@ hl.config({
     input = {
         kb_layout = "us",
         numlock_by_default = true,
-        repeat_delay = 250,
-        repeat_rate = 35,
+        repeat_delay = 200,
+        repeat_rate = 40,
 
         follow_mouse = 1,
         off_window_axis_events = 2,

@@ -46,16 +46,6 @@ Rectangle {
                     materialSymbol: modelData.materialSymbol
                 }
             }
-            Repeater {
-                model: ScriptModel {
-                    values: OverlayContext.extensionWidgets
-                }
-                delegate: WidgetButton {
-                    required property var modelData
-                    identifier: modelData.identifier
-                    materialSymbol: modelData.materialSymbol
-                }
-            }
         }
 
         Separator {}

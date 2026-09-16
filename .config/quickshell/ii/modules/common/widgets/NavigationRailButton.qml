@@ -12,16 +12,12 @@ TabButton {
     property string buttonIcon
     property real buttonIconRotation: 0
     property string buttonText
-    property bool _isInitialized: false
-    Component.onCompleted: _isInitialized = true
-
     property bool expanded: false
     property bool showToggledHighlight: true
     readonly property real visualWidth: root.expanded ? root.baseSize + 20 + itemText.implicitWidth : root.baseSize
 
     property real baseSize: 56
     property real baseHighlightHeight: 32
-    property real iconSize: 24
     property real highlightCollapsedTopMargin: 8
     padding: 0
 
@@ -75,8 +71,6 @@ TabButton {
                 }
             }
             transitions: Transition {
-                enabled: root._isInitialized
-
                 AnchorAnimation {
                     duration: Appearance.animation.elementMoveFast.duration
                     easing.type: Appearance.animation.elementMoveFast.type
@@ -108,7 +102,7 @@ TabButton {
                 id: navRailButtonIcon
                 rotation: root.buttonIconRotation
                 anchors.centerIn: parent
-                iconSize: root.iconSize
+                iconSize: 24
                 fill: toggled ? 1 : 0
                 font.weight: (toggled || root.hovered) ? Font.DemiBold : Font.Normal
                 text: buttonIcon
@@ -122,37 +116,25 @@ TabButton {
 
         StyledText {
             id: itemText
-            states: [
-                State {
-                    name: "expanded"
-                    when: root.expanded
-                    AnchorChanges {
-                        target: itemText
-                        anchors {
-                            top: undefined
-                            horizontalCenter: undefined
-                            left: itemIconBackground.right
-                            verticalCenter: itemIconBackground.verticalCenter
-                        }
-                    }
-                },
-                State {
-                    name: "minimized"
-                    when: !root.expanded
-                    AnchorChanges {
-                        target: itemText
-                        anchors {
-                            left: undefined
-                            verticalCenter: undefined
-                            top: itemIconBackground.bottom
-                            horizontalCenter: itemIconBackground.horizontalCenter
-                        }
+            anchors {
+                top: itemIconBackground.bottom
+                topMargin: 2
+                horizontalCenter: itemIconBackground.horizontalCenter
+            }
+            states: State {
+                name: "expanded"
+                when: root.expanded
+                AnchorChanges {
+                    target: itemText
+                    anchors {
+                        top: undefined
+                        horizontalCenter: undefined
+                        left: itemIconBackground.right
+                        verticalCenter: itemIconBackground.verticalCenter
                     }
                 }
-            ]
+            }
             transitions: Transition {
-                enabled: root._isInitialized
-
                 AnchorAnimation {
                     duration: Appearance.animation.elementMoveFast.duration
                     easing.type: Appearance.animation.elementMoveFast.type

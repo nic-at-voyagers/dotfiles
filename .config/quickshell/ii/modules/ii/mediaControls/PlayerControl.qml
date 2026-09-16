@@ -29,12 +29,8 @@ Item { // Player instance
     property string displayedArtFilePath: root.downloaded ? Qt.resolvedUrl(artFilePath) : ""
 
     component TrackChangeButton: RippleButton {
-        id: button
-        property int buttonSize: 24
-        property bool fill: true
-
-        implicitWidth: buttonSize
-        implicitHeight: buttonSize
+        implicitWidth: 24
+        implicitHeight: 24
 
         property var iconName
         colBackground: ColorUtils.transparentize(blendedColors.colSecondaryContainer, 1)
@@ -42,10 +38,10 @@ Item { // Player instance
         colRipple: blendedColors.colSecondaryContainerActive
 
         contentItem: MaterialSymbol {
-            iconSize: buttonSize
-            fill: button.fill ? 1 : 0
+            iconSize: Appearance.font.pixelSize.huge
+            fill: 1
             horizontalAlignment: Text.AlignHCenter
-            color: blendedColors.colSecondary
+            color: blendedColors.colOnSecondaryContainer
             text: iconName
 
             Behavior on color {
@@ -279,16 +275,7 @@ Item { // Player instance
                             iconName: "skip_next"
                             downAction: () => root.player?.next()
                         }
-
-                        TrackChangeButton {
-                            iconName: "keep"
-                            buttonSize: 18
-                            fill: MprisController.activePlayer == root.player
-                            downAction: () => MprisController.activePlayer = root.player
-                        }
                     }
-
-                    
 
                     RippleButton {
                         id: playPauseButton

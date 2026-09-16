@@ -1,8 +1,18 @@
+-- User Keybindings
+hl.bind("CTRL + SUPER + Slash", hl.dsp.exec_cmd("xdg-open ~/.config/illogical-impulse/config.json"), { description = "Edit shell config" })
+
+-- >>> quickshell:managed:begin v1 - written by Settings -> Hyprland. Edits here are overwritten; put your own Lua above.
+pcall(hl.unbind, "SUPER + C")                                                   --@u SUPER+c
+hl.bind("SUPER + C", hl.dsp.window.close(), { description = "Window: Close" })  --@b SUPER+c
+pcall(hl.unbind, "SUPER + D")                                                   --@u SUPER+d
+hl.bind("SUPER + D", hl.dsp.exec_cmd("vesktop"), { description = "App: Vesktop" })  --@b SUPER+d
+pcall(hl.unbind, "SUPER + Q")                                                   --@u SUPER+q
+hl.bind("SUPER + Q", hl.dsp.exec_cmd("kitty"), { description = "App: Terminal" })  --@b SUPER+q
+-- <<< quickshell:managed:end
+
 hl.bind("CTRL+SUPER+ALT+Slash", hl.dsp.exec_cmd("xdg-open ~/.config/hypr/custom/keybinds.lua"), {description = "Edit user keybinds"} )
 
-hl.bind("SUPER + Q", hl.dsp.exec_cmd(terminal), {description = "Terminal"} )
 hl.bind("SUPER + C", hl.dsp.window.close(), {description = "Close"} )
-hl.bind("SUPER + D", hl.dsp.exec_cmd("vesktop"), {description = "Vesktop"})
 
 --#/# bind = SUPER+ALT, Hash,, -- Send to workspace -- (1, 2, 3,...)
 for i = 1, 10 do

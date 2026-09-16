@@ -8,27 +8,16 @@ MaterialShape {
     property alias iconSize: symbol.iconSize
     property alias font: symbol.font
     property alias colSymbol: symbol.color
-    property alias fill: symbol.fill
-    property alias animateChange: symbol.animateChange
-    property real padding: 8
-
-    property bool rotateIconWithShape: false
+    property real padding: 6
 
     color: Appearance.colors.colSecondaryContainer
     colSymbol: Appearance.colors.colOnSecondaryContainer
     shape: MaterialShape.Shape.Clover4Leaf
-    implicitSize: iconSize + padding * 2
-
-    Behavior on rotation {
-        animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
-    }
+    implicitSize: Math.max(symbol.implicitWidth, symbol.implicitHeight) + padding * 2
 
     MaterialSymbol {
         id: symbol
         anchors.centerIn: parent
         color: root.colSymbol
-        width: root.iconSize
-        height: root.iconSize
-        rotation: !root.rotateIconWithShape ? 360 - root.rotation: root.rotation
     }
 }

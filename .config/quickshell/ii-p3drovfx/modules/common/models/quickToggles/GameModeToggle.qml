@@ -21,10 +21,10 @@ QuickToggleModel {
                 "decoration:shadow:enabled": 0,
                 "decoration:blur:enabled": 0,
                 "general:gaps_in": 0,
-                "general:gaps_out": 0,
-                "general:border_size": 4,
+                "general:gaps_out": 15,
+                "general:border_size": 3,
                 "decoration:rounding": 0,
-								"decoration:rounding_power": 0,
+		"decoration:rounding_power": 0,
                 "general:allow_tearing": 1
             }, {
                 addLines: [root.opaqueRule]

@@ -1,5 +1,4 @@
 pragma ComponentBehavior: Bound
-import qs
 import qs.modules.common
 import qs.modules.common.utils
 import qs.modules.common.functions
@@ -28,7 +27,9 @@ PanelWindow {
         bottom: true
     }
 
-    enum SnipAction { Copy, Edit, Search, CharRecognition, Record, RecordWithSound, AskAI } 
+    // Modes
+    // TODO: Ask: sidebar AI
+    enum SnipAction { Copy, Edit, Search, CharRecognition, Record, RecordWithSound } 
     enum SelectionMode { RectCorners, Circle }
     enum Phase { Select, Post }
     property var action: RegionSelection.SnipAction.Copy
@@ -249,8 +250,6 @@ PanelWindow {
                 return ScreenshotAction.Action.Record;
             case RegionSelection.SnipAction.RecordWithSound:
                 return ScreenshotAction.Action.RecordWithSound;
-            case RegionSelection.SnipAction.AskAI:
-                return ScreenshotAction.Action.AskAI;
             default:
                 console.warn("[Region Selector] Unknown snip action, skipping snip.");
                 root.dismiss();
@@ -273,11 +272,8 @@ PanelWindow {
         root.regionHeight = Math.max(0, Math.min(root.regionHeight, root.screen.height - root.regionY));
 
         // Adjust action
-        if (root.action === RegionSelection.SnipAction.Copy || root.action === RegionSelection.SnipAction.Edit) { 
+        if (root.action === RegionSelection.SnipAction.Copy || root.action === RegionSelection.SnipAction.Edit) {
             root.action = root.mouseButton === Qt.RightButton ? RegionSelection.SnipAction.Edit : RegionSelection.SnipAction.Copy;
-        }
-        if (root.action === RegionSelection.SnipAction.Search || root.action === RegionSelection.SnipAction.AskAI) {
-            root.action = root.mouseButton === Qt.RightButton ? RegionSelection.SnipAction.AskAI : RegionSelection.SnipAction.Search;
         }
         
         const screenshotDir = Config.options.screenSnip.savePath !== "" ? //
@@ -293,10 +289,6 @@ PanelWindow {
             screenshotDir
         )
         Quickshell.execDetached(command);
-        if (root.action === RegionSelection.SnipAction.AskAI) {
-            Ai.handleClipboardAndAttach();
-            GlobalStates.policiesPanelOpen = true
-        }
         if (root.action == RegionSelection.SnipAction.Record || root.action == RegionSelection.SnipAction.RecordWithSound) {
             root.phase = RegionSelection.Phase.Post
             root.selectionMode = RegionSelection.SelectionMode.RectCorners
@@ -305,9 +297,12 @@ PanelWindow {
         }
     }
 
-    // Dont use anything like stdout here, this is being called detached
-    Process {
-        id: snipProc
+    // Only clickable in Selection phase
+    mask: Region {
+        item: switch(root.phase) {
+            case RegionSelection.Phase.Select: return mouseArea;
+            case RegionSelection.Phase.Post: return null;
+        }
     }
 
     ScreencopyView { // For freezing

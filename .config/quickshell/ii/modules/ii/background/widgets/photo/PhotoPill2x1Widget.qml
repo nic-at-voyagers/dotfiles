@@ -63,7 +63,7 @@ AbstractBackgroundWidget {
                     return path.startsWith("file://") ? path : ("file://" + path);
                 }
                 fillMode: Image.PreserveAspectCrop
-                visible: false
+                visible: true
             }
 
             // Crisp clear image layer

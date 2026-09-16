@@ -9,66 +9,26 @@ ColumnLayout {
     id: clockColumn
     spacing: 4
 
-    readonly property bool colorful: Config.options.background.widgets.clock.digital.colorful
-    readonly property bool showColon: Config.options.background.widgets.clock.digital.showColon
-
     property bool isVertical: Config.options.background.widgets.clock.digital.vertical
     property color colText: Appearance.colors.colOnSecondaryContainer
-    property color colTextSecondary: Appearance.colors.colOnLayer3
-    property color colTextTertiary: Appearance.colors.colOnLayer3
     property var textHorizontalAlignment: Text.AlignHCenter
 
     // Time
-    RowLayout {
-        Layout.alignment: Qt.AlignHCenter
-        Layout.fillWidth: false
-        ClockText {
-            id: timeTextTop
-            text: DateTime.time.split(":")[0].padStart(2, "0")
-            color: clockColumn.colText
-            horizontalAlignment: Text.AlignHCenter
-            font {
-                pixelSize: Config.options.background.widgets.clock.digital.font.size
-                weight: Config.options.background.widgets.clock.digital.font.weight
-                family: Config.options.background.widgets.clock.digital.font.family
-                variableAxes: ({
-                        "wdth": Config.options.background.widgets.clock.digital.font.width,
-                        "ROND": Config.options.background.widgets.clock.digital.font.roundness
-                    })
-            }
-        }
-        Loader {
-            active: !clockColumn.isVertical && showColon
-            visible: active
-            sourceComponent: ClockText {
-                text: ":"
-                color: colorful ? clockColumn.colTextSecondary : clockColumn.colText
-                horizontalAlignment: clockColumn.textHorizontalAlignment
-                font {
-                    pixelSize: timeTextTop.font.pixelSize
-                    weight: timeTextTop.font.weight
-                    family: timeTextTop.font.family
-                    variableAxes: timeTextTop.font.variableAxes
-                }
-            }
-        }
-        Loader {
-            active: !clockColumn.isVertical
-            visible: active
-            sourceComponent: ClockText {
-                text: DateTime.time.split(":")[1].split(" ")[0].padStart(2, "0")
-                color: colorful ? clockColumn.colTextTertiary : clockColumn.colText
-                horizontalAlignment: clockColumn.textHorizontalAlignment
-                font {
-                    pixelSize: timeTextTop.font.pixelSize
-                    weight: timeTextTop.font.weight
-                    family: timeTextTop.font.family
-                    variableAxes: timeTextTop.font.variableAxes
-                }
-            }
+    ClockText {
+        id: timeTextTop
+        text: clockColumn.isVertical ? DateTime.time.split(":")[0].padStart(2, "0") : DateTime.time
+        color: clockColumn.colText
+        horizontalAlignment: Text.AlignHCenter
+        font {
+            pixelSize: Config.options.background.widgets.clock.digital.font.size
+            weight: Config.options.background.widgets.clock.digital.font.weight
+            family: Config.options.background.widgets.clock.digital.font.family
+            variableAxes: ({
+                    "wdth": Config.options.background.widgets.clock.digital.font.width,
+                    "ROND": Config.options.background.widgets.clock.digital.font.roundness
+                })
         }
     }
-    
 
     Loader {
         Layout.topMargin: -40
@@ -78,7 +38,7 @@ ColumnLayout {
         sourceComponent: ClockText {
             id: timeTextBottom
             text: DateTime.time.split(":")[1].split(" ")[0].padStart(2, "0")
-            color: colorful ? clockColumn.colTextTertiary : clockColumn.colText
+            color: clockColumn.colText
             horizontalAlignment: clockColumn.textHorizontalAlignment
             font {
                 pixelSize: timeTextTop.font.pixelSize
@@ -95,7 +55,7 @@ ColumnLayout {
         Layout.topMargin: -20
         Layout.fillWidth: true
         text: DateTime.longDate
-        color: colorful ? clockColumn.colTextSecondary : clockColumn.colText
+        color: clockColumn.colText
         horizontalAlignment: clockColumn.textHorizontalAlignment
     }
 
@@ -105,7 +65,7 @@ ColumnLayout {
         font.pixelSize: Appearance.font.pixelSize.normal
         text: Config.options.background.widgets.clock.quote.text
         animateChange: false
-        color: clockColumn.colTextSecondary
+        color: clockColumn.colText
         horizontalAlignment: clockColumn.textHorizontalAlignment
     }
 }

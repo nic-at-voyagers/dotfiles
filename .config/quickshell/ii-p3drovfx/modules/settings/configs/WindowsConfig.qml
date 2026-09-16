@@ -474,20 +474,13 @@ ContentPage {
             checked: Config.options.appearance.appLaunchAnimation.enable ?? true
             onCheckedChanged: {
                 Config.options.appearance.appLaunchAnimation.enable = checked;
-                HyprlandSettings.updateAppLaunchAnimation(
-                    checked,
-                    Config.options.appearance.appLaunchAnimation.startPercent,
-                    Config.options.appearance.appLaunchAnimation.speed,
-                    Config.options.appearance.appLaunchAnimation.curve
-                );
-            }
         }
 
         ConfigSlider {
             buttonIcon: "aspect_ratio"
             text: Translation.tr("Opening initial scale")
             usePercentTooltip: true
-            enabled: Config.options.appearance.appLaunchAnimation.enable ?? true
+            ecnabled: Config.options.appearance.appLaunchAnimation.enable ?? true
             from: 5
             to: 50
             stepSize: 5
@@ -497,13 +490,7 @@ ContentPage {
             onValueChanged: {
                 const val = Math.round(value);
                 Config.options.appearance.appLaunchAnimation.startPercent = val;
-                HyprlandSettings.updateAppLaunchAnimation(
-                    Config.options.appearance.appLaunchAnimation.enable ?? true,
-                    val,
-                    Config.options.appearance.appLaunchAnimation.speed,
-                    Config.options.appearance.appLaunchAnimation.curve
-                );
-            }
+		}
         }
 
         ConfigSlider {
@@ -518,12 +505,6 @@ ContentPage {
             value: Config.options.appearance.appLaunchAnimation.speed ?? 3.2
             onValueChanged: {
                 Config.options.appearance.appLaunchAnimation.speed = value;
-                HyprlandSettings.updateAppLaunchAnimation(
-                    Config.options.appearance.appLaunchAnimation.enable ?? true,
-                    Config.options.appearance.appLaunchAnimation.startPercent,
-                    value,
-                    Config.options.appearance.appLaunchAnimation.curve
-                );
             }
         }
     }

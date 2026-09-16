@@ -20,7 +20,6 @@ AbstractBackgroundWidget {
     readonly property bool forceCenter: (GlobalStates.screenLocked && Config.options.lock.centerClock)
     readonly property bool shouldShow: (!Config.options.background.widgets.clock.showOnlyWhenLocked || GlobalStates.screenLocked)
     property bool wallpaperSafetyTriggered: false
-    property bool isCovered: false
     needsColText: clockStyle === "digital"
     x: forceCenter ? ((root.screenWidth - root.width) / 2) : targetX
     y: forceCenter ? ((root.screenHeight - root.height) / 2) : targetY
@@ -50,7 +49,6 @@ AbstractBackgroundWidget {
                 spacing: 10
                 CookieClock {
                     anchors.horizontalCenter: parent.horizontalCenter
-                    isCovered: root.isCovered
                 }
                 FadeLoader {
                     anchors.horizontalCenter: parent.horizontalCenter
@@ -67,8 +65,6 @@ AbstractBackgroundWidget {
             fade: false
             sourceComponent: DigitalClock {
                 colText: root.colText
-                colTextSecondary: root.colTextSecondary
-                colTextTertiary: root.colTextTertiary
                 textHorizontalAlignment: root.textHorizontalAlignment
             }
         }

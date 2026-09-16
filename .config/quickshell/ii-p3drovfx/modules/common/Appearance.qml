@@ -272,19 +272,6 @@ Singleton {
         return colors.colPrimary;
     }
 
-    function pushBorderColor(): void {
-        let colorStr = root.activeBorderColor.toString();
-        let rgb = "";
-        if (colorStr.startsWith("#")) {
-            let hex = colorStr.substring(1);
-            rgb = hex.length === 8 ? hex.substring(2) : hex;
-        }
-        if (rgb === "")
-            return;
-        let hyprColor = "rgba(" + rgb + "AA)";
-        Quickshell.execDetached(["hyprctl", "eval", "hl.config({ general = { ['col.active_border'] = '" + hyprColor + "' }, group = { ['col.border_active'] = '" + hyprColor + "', groupbar = { ['col.active'] = '" + hyprColor + "' } } })"]);
-    }
-
     function pushBorderSize(): void {
         Quickshell.execDetached(["hyprctl", "eval", "hl.config({ general = { border_size = " + (root.borderless ? "0" : root.borderWidth) + " } })"]);
     }
@@ -431,7 +418,7 @@ Singleton {
     property bool _isApplyingBorder: false
     property bool _borderReapplyPending: false
 
-    function applyHyprlandBorder() {
+        function applyHyprlandBorder() {
         if (!Config.ready)
             return;
         if (root._isApplyingBorder) {
@@ -442,6 +429,19 @@ Singleton {
         hyprlandBorderCooldownTimer.restart();
         root.pushBorderSize();
         root.pushBorderColor();
+    }
+
+    Timer {
+        id: hyprlandRuleCooldownTimer
+        interval: 3000
+        repeat: false
+        onTriggered: {
+            root._isApplyingRules = false;
+            if (!root._rulesReapplyPending)
+                return;
+            root._rulesReapplyPending = false;
+            root.applyHyprlandRules();
+        }
     }
 
     function applyHyprlandRules() {
@@ -475,6 +475,16 @@ Singleton {
                 root._rulesReapplyPending = true;
                 return;
             }
+            root.applyHyprlandRules();
+        }
+    }
+
+    Timer {
+        id: startupRoundingTimer
+        interval: 1500
+        running: Config.ready
+        repeat: false
+        onTriggered: {
             root.applyHyprlandRules();
         }
     }

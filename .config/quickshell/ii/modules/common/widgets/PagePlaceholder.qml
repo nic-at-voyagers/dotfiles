@@ -1,9 +1,7 @@
 import QtQuick
 import QtQuick.Layouts
-import qs
 import qs.modules.common
 import qs.modules.common.widgets
-import qs.modules.common.widgets.animations
 
 Item {
     id: root
@@ -14,18 +12,6 @@ Item {
     property alias description: widgetDescriptionText.text
     property alias shape: shapeWidget.shape
     property alias descriptionHorizontalAlignment: widgetDescriptionText.horizontalAlignment
-    property alias rotateIconWithShape: shapeWidget.rotateIconWithShape
-
-    property alias iconWidget: shapeWidget
-    property alias titleWidget: widgetNameText
-    property alias descriptionWidget: widgetDescriptionText
-
-    property alias triggerAnimationOn: openingAnimation.trigger
-    property alias rotateToRight: openingAnimation.rotateToRight
-    PlaceholderOpeningAnimation {
-        id: openingAnimation
-        targetPlaceholder: root
-    }
 
     opacity: shown ? 1 : 0
     visible: opacity > 0
@@ -48,13 +34,8 @@ Item {
             Layout.alignment: Qt.AlignHCenter
             padding: 12
             iconSize: 56
-            rotation: -70 * (1 - shown ? 1 : 0)
-
-            Behavior on rotation {
-                animation: Appearance.animation.elementMoveEnter.numberAnimation.createObject(this)
-            }
+            rotation: -30 * (1 - root.opacity)
         }
-
         StyledText {
             id: widgetNameText
             visible: title !== ""

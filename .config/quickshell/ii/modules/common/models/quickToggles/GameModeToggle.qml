@@ -12,7 +12,7 @@ QuickToggleModel {
     mainAction: () => {
         root.toggled = !root.toggled;
         if (root.toggled) {
-            HyprlandSettings.setKeys({
+            HyprlandConfig.setMany({
                 "animations:enabled": 0,
                 "decoration:shadow:enabled": 0,
                 "decoration:blur:enabled": 0,
@@ -23,15 +23,15 @@ QuickToggleModel {
                 "general:allow_tearing": 1
             });
         } else {
-            HyprlandSettings.resetKeys([
-                "animations:enabled",
-                "decoration:shadow:enabled",
-                "decoration:blur:enabled",
-                "general:gaps_in",
-                "general:gaps_out",
-                "general:border_size",
-                "decoration:rounding",
-                "general:allow_tearing",
+            HyprlandConfig.resetMany([ //
+                "animations:enabled", //
+                "decoration:shadow:enabled", //
+                "decoration:blur:enabled", //
+                "general:gaps_in", //
+                "general:gaps_out", //
+                "general:border_size", //
+                "decoration:rounding", //
+                "general:allow_tearing", //
             ]);
         }
     }

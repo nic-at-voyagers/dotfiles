@@ -29,7 +29,7 @@ Rectangle {
             color: Appearance.colors.colOnPrimaryContainer
         }
 
-        RowLayout {
+        ColumnLayout {
             Layout.fillWidth: true
             spacing: 4
 
