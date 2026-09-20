@@ -19,7 +19,6 @@ return {
 		return {
 			enabled = has_parser("markdown") and has_parser("markdown_inline"),
 			file_types = { "markdown" },
-			preset = "obsidian",
 			render_modes = { "n", "c", "t" },
 			restart_highlighter = false,
 			anti_conceal = {

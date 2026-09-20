@@ -14,3 +14,13 @@ vim.api.nvim_create_autocmd("FileType", {
 		vim.bo.tabstop = 4
 	end,
 })
+
+vim.api.nvim_create_autocmd("VimEnter", {
+	callback = function(data)
+		local arg = data.file
+		-- if nvim was started with a directory argument
+		if arg ~= "" and vim.fn.isdirectory(arg) == 1 then
+			vim.cmd.cd(arg)
+		end
+	end,
+})
