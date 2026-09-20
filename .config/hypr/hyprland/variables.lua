@@ -2,7 +2,6 @@
 -- Copy these to ~/.config/hypr/custom/variables.lua to make changes in a dotfiles-update-friendly manner
 
 -- The folder within ~/.config/quickshell containing the config
-hl.env("qsConfig", "ii")
 
 -- Apps
 -- PULL REQUESTS ADDING MORE WILL NOT BE ACCEPTED, CONFIG FOR YOURSELF

@@ -8,10 +8,33 @@ hl.config({
 			active_border = { colors = {"rgb(09ddff)", "rgb(003bd2)"}},
 			inactive_border = "rgb(003bd2)"
 		},
+		gaps_in = 4,
+		gaps_out = 15,
+		gaps_workspaces = 50,
+
+		border_size = 3,
+
 	},
 	decoration = {
 		active_opacity = 1,
 		inactive_opacity = 1,
 		fullscreen_opacity = 1,
+		blur = {
+			enabled = true,
+			xray = true,
+			special = false,
+			new_optimizations = true,
+			size = 1,
+			passes = 1,
+			brightness = 1,
+			noise = 0.00,
+			contrast = 1,
+			vibrancy = 0.5,
+			vibrancy_darkness = 0.5,
+			popups = true,
+			popups_ignorealpha = 0.6,
+			input_methods = false,
+			input_methods_ignorealpha = 0.8
+		},
 	}
 })
