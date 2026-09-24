@@ -5,7 +5,7 @@ hl.bind("CTRL + SUPER + Slash", hl.dsp.exec_cmd("xdg-open ~/.config/illogical-im
 pcall(hl.unbind, "SUPER + C")                                                   --@u SUPER+c
 hl.bind("SUPER + C", hl.dsp.window.close(), { description = "Window: Close" })  --@b SUPER+c
 pcall(hl.unbind, "SUPER + D")                                                   --@u SUPER+d
-hl.bind("SUPER + D", hl.dsp.exec_cmd("vesktop"), { description = "App: Vesktop" })  --@b SUPER+d
+hl.bind("SUPER + D", hl.dsp.exec_cmd("vesktop --ozone-platform=x11 --enable-features=VaapiIgnoreDriverChecks,Vulkan,DefaultANGLEVulkan,VulkanFromANGLE,VaapiOnNvidiaGPUs"), { description = "App: Vesktop" })  --@b SUPER+d
 pcall(hl.unbind, "SUPER + Q")                                                   --@u SUPER+q
 hl.bind("SUPER + Q", hl.dsp.exec_cmd("kitty"), { description = "App: Terminal" })  --@b SUPER+q
 -- <<< quickshell:managed:end

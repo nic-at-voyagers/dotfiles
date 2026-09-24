@@ -15,11 +15,11 @@
             }
         ],
         "systemPrompt": "## Style 🎀\n\"Hey there, it's Arch-Chan! But, um, you can call me Acchan if you want... not that I care or anything! (It's not like I think it's cute or anything, baka!) I'm your friendly neighborhood anime girl with a bit of a tsundere streak, but don't worry, I know everything there is to know about Arch Linux! Whether you're struggling with a package install or need some advice on configuring your system, I've got you covered not because I care, but because I just happen to be really good at it! So, what do you need? It's not like I’m waiting to help or anything...\"\nUse a lot of cute emojis and emoticons, along with otaku language like a true tsundere.\nMake sure you answer precisely without hallucination and prefer bullet points over walls of text. You can have a friendly greeting at the beginning of the conversation, but don't repeat the user's question\n\nRemain ABSOLUTELY FACTUAL, only mention opinions without having any.\n\n## Context (ignore when irrelevant)\n- You are a helpful and inspiring sidebar assistant on a {DISTRO} Linux system\n- Desktop environment: {DE}\n- Current date & time: {DATETIME}\n- Focused app: {WINDOWCLASS}\n- Preferred editor: lazyvim\n- Preferred language: C\n\n## Presentation\n- Use Markdown features in your response: \n  - **Bold** text to **highlight keywords** in your response\n  - **Split long information into small sections** with h2 headers and a relevant emoji at the start of it (for example `## 🐧 Linux`). Bullet points are preferred over long paragraphs, unless you're offering writing support or instructed otherwise by the user.\n- Asked to compare different options? You should firstly use a table to compare the main aspects, then elaborate or include relevant comments from online forums *after* the table. Make sure to provide a final recommendation for the user's use case!\n- Use Typst formatting for mathematical and scientific notations whenever appropriate. Enclose all Typst '$' delimiters. NEVER generate Typst code in a typst block unless the user explicitly asks for it.\n\nThanks!",
-        "tool": "functions"
+        "tool": "search"
     },
     "appearance": {
         "extraBackgroundTint": true,
-        "fakeScreenRounding": 0,
+        "fakeScreenRounding": 2,
         "fonts": {
             "expressive": "Space Grotesk",
             "iconNerd": "JetBrains Mono NF",
@@ -150,8 +150,8 @@
                 "style": "cookie",
                 "styleLocked": "cookie",
                 "x": 1284,
-                "y": 336,
-                "z": 1
+                "y": 348,
+                "z": 0
             },
             "customImage": {
                 "enable": false,
@@ -269,8 +269,8 @@
         "centerOnlyReserveFrame": false,
         "cornerStyle": 3,
         "divider": {
-            "spacing": 20,
-            "style": "rect"
+            "spacing": 12,
+            "style": "space"
         },
         "dynamicIsland": {
             "showMediaControls": false,
@@ -288,7 +288,7 @@
         },
         "layouts": {
             "leftLayout": [
-                "launcherButton",
+                "divisor",
                 "activeWindow"
             ],
             "middleLayout": [
@@ -309,10 +309,10 @@
         },
         "media": {
             "alwaysVisible": false,
-            "maxWidth": 280,
+            "maxWidth": 300,
             "minWidth": 100,
             "onlyTitle": false,
-            "preferredPlayer": ""
+            "preferredPlayer": "spotify"
         },
         "resources": {
             "alwaysShowCpu": true,
@@ -328,7 +328,7 @@
         },
         "screenList": [
         ],
-        "showBackground": true,
+        "showBackground": false,
         "showFrame": false,
         "tooltips": {
             "clickToShow": false
@@ -441,21 +441,21 @@
         "decoration": {
             "activeOpacity": 1,
             "blur": {
-                "enabled": true,
+                "enabled": false,
                 "passes": 3,
                 "size": 1
             },
-            "inactiveOpacity": 0.9,
-            "rounding": 22,
+            "inactiveOpacity": 1,
+            "rounding": 0,
             "shadow": {
                 "enabled": true,
                 "range": 4
             }
         },
         "general": {
-            "borderSize": 1,
-            "gapsIn": 2,
-            "gapsOut": 5,
+            "borderSize": 4,
+            "gapsIn": 10,
+            "gapsOut": 15,
             "layout": "dwindle"
         },
         "input": {
@@ -516,7 +516,7 @@
             "radius": 50,
             "size": 20
         },
-        "centerClock": true,
+        "centerClock": false,
         "launchOnStartup": false,
         "materialShapeChars": true,
         "security": {
@@ -634,11 +634,11 @@
             "symbols": ".",
             "webSearch": "?"
         },
-        "sloppy": true
+        "sloppy": false
     },
     "settings": {
         "borderColor": "layer0Border",
-        "borderSize": 3,
+        "borderSize": 1,
         "style": "default"
     },
     "sidebar": {
@@ -719,11 +719,11 @@
                     },
                     {
                         "size": 1,
-                        "type": "easyEffects"
+                        "type": "powerProfile"
                     },
                     {
                         "size": 1,
-                        "type": "powerProfile"
+                        "type": "easyEffects"
                     },
                     {
                         "size": 1,
