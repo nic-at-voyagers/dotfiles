@@ -9,7 +9,6 @@
             "separator": " "
       },
       "general": {
-            "preRun": "clear"
       },
       "modules": [
             {
