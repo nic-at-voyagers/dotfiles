@@ -5,7 +5,6 @@ import Quickshell
 import Quickshell.Io
 import qs.modules.common.functions
 import qs.services
-import "HyprlandBlur.js" as HyprlandBlur
 
 Singleton {
     id: root
@@ -272,75 +271,28 @@ Singleton {
         return colors.colPrimary;
     }
 
-    function pushBorderSize(): void {
-        Quickshell.execDetached(["hyprctl", "eval", "hl.config({ general = { border_size = " + (root.borderless ? "0" : root.borderWidth) + " } })"]);
-    }
 
-    onActiveBorderColorChanged: {
-        if (Config.ready) {
-            hyprctlBorderTimer.restart();
+    Timer {
+        id: hyprctlBorderTimer
+        interval: 100
+        repeat: false
+        onTriggered: {
+            if (!Config.ready)
+                return;
         }
     }
+
 
     property bool borderless: Config.options.appearance.borderless ?? false
-    onBorderlessChanged: {
-        if (Config.ready) {
-            root.pushBorderSize();
-        }
-    }
 
     property int borderWidth: Config.options.appearance.borderWidth ?? 2
-    onBorderWidthChanged: {
-        if (Config.ready && !borderless) {
-            root.pushBorderSize();
-        }
-    }
     property int blurSize: Config.options.appearance.blurSize ?? 8
     readonly property string blurConfigScript: HyprlandBlur.buildScript(root.blurSize, Config.options.appearance.blur)
-    onBlurConfigScriptChanged: root.scheduleBlurUpdate()
     property bool _blurUpdatePending: false
     property bool _blurLayerRulesPending: false
 
-    function scheduleBlurUpdate() {
-        if (!Config.ready)
-            return;
-        root._blurUpdatePending = true;
-        if (!hyprlandBlurTimer.running && !hyprlandBlurProcess.running)
-            hyprlandBlurTimer.start();
-    }
-
     // Throttle instead of restarting a debounce on every move: long drags still
     // update live, with one process at a time and the newest values sent last.
-    Timer {
-        id: hyprlandBlurTimer
-        interval: 50
-        repeat: false
-        onTriggered: {
-            if (!Config.ready || (!root._blurUpdatePending && !root._blurLayerRulesPending) || hyprlandBlurProcess.running)
-                return;
-            const script = (root._blurUpdatePending ? root.blurConfigScript : "")
-                + (root._blurLayerRulesPending ? " " + root.getLayerRulesScript() : "");
-            root._blurUpdatePending = false;
-            root._blurLayerRulesPending = false;
-            hyprlandBlurProcess.command = ["hyprctl", "eval", script];
-            hyprlandBlurProcess.running = true;
-        }
-    }
-
-    Process {
-        id: hyprlandBlurProcess
-        stdout: StdioCollector { id: hyprlandBlurOutput }
-        stderr: StdioCollector { id: hyprlandBlurError }
-        onRunningChanged: {
-            if (!running && (root._blurUpdatePending || root._blurLayerRulesPending) && Config.ready)
-                hyprlandBlurTimer.start();
-        }
-        onExited: (exitCode, exitStatus) => {
-            if (exitCode !== 0)
-                console.warn("[Appearance] Could not apply Hyprland blur settings (exit " + exitCode + "): "
-                    + (hyprlandBlurError.text || hyprlandBlurOutput.text).trim());
-        }
-    }
 
     property real ignoreAlpha: Config.options.appearance.ignoreAlpha ?? 0.2
 
@@ -356,51 +308,8 @@ Singleton {
     readonly property bool popupBlurEnabled: (Config.options?.appearance?.transparency?.enable ?? false) && (Config.options?.appearance?.transparency?.popups ?? false)
     readonly property real popupIgnoreAlpha: Math.min(root.ignoreAlpha, Math.max(0, 1 - root.backgroundTransparency - 0.01))
 
-    function getLayerRulesScript(): string {
-        var a = root.ignoreAlpha;
-        var barA = root.barIgnoreAlpha;
-        var script = "";
-        // Named rules merge on re-declaration: dragging Ignore Alpha must update
-        // the existing rules, not keep adding anonymous rules to the compositor.
-        script += "hl.layer_rule({ name = 'ii:appearance:layers', match = { namespace = 'quickshell.*' }, blur = true, blur_popups = true, ignore_alpha = " + a + " }) ";
-        if (root.popupBlurEnabled) {
-            var popupA = root.popupIgnoreAlpha;
-            script += "hl.layer_rule({ name = 'ii:appearance:popup-family', match = { namespace = 'quickshell:.*[pP]opup' }, blur = true, blur_popups = true, ignore_alpha = " + popupA + " }) ";
-            script += "hl.layer_rule({ name = 'ii:appearance:popup', match = { namespace = 'quickshell:popup' }, blur = true, blur_popups = true, ignore_alpha = " + popupA + " }) ";
-        } else {
-            script += "hl.layer_rule({ name = 'ii:appearance:popup-family', match = { namespace = 'quickshell:.*[pP]opup' }, blur = false, blur_popups = false, ignore_alpha = 0.5 }) ";
-            script += "hl.layer_rule({ name = 'ii:appearance:popup', match = { namespace = 'quickshell:popup' }, blur = false, blur_popups = false, ignore_alpha = 0.5 }) ";
-        }
-        script += "hl.layer_rule({ name = 'ii:appearance:bar', match = { namespace = 'quickshell:(bar|floatingNotch)' }, blur = true, ignore_alpha = " + barA + " }) ";
-        script += "hl.layer_rule({ name = 'ii:appearance:background', match = { namespace = 'quickshell:background' }, blur = false }) ";
-        script += "hl.layer_rule({ name = 'ii:appearance:corners', match = { namespace = 'quickshell:screenCorners' }, order = 10 }) ";
-        script += "hl.layer_rule({ name = 'ii:appearance:session', match = { namespace = 'quickshell:session' }, blur = true, ignore_alpha = 0.0 }) ";
-        script += "hl.layer_rule({ name = 'ii:appearance:task-view', match = { namespace = 'quickshell:wTaskView' }, blur = true, ignore_alpha = 0.0 }) ";
-        script += "hl.layer_rule({ name = 'ii:appearance:overview-transition', match = { namespace = 'quickshell:overviewWindowTransition' }, blur = false }) ";
-        script += "hl.layer_rule({ name = 'ii:appearance:workspace-overlay', match = { namespace = 'quickshell:workspaceBlurOverlay' }, blur = true, ignore_alpha = 0.0, order = -1, animation = 'fade' }) ";
-        script += "hl.layer_rule({ name = 'ii:appearance:notification-animation', match = { namespace = 'quickshell:notificationPopup' }, no_anim = true }) ";
-        // ignore_alpha is a layer effect, not a supported window-rule field.
-        script += "hl.window_rule({ name = 'ii:appearance:settings', match = { title = '^(illogical-impulse Settings)$' }, no_blur = false }) ";
-        return script;
-    }
-
-    function pushHyprlandLayerRules() {
-        if (Config.ready) {
-            root._blurLayerRulesPending = true;
-            if (!hyprlandBlurTimer.running && !hyprlandBlurProcess.running)
-                hyprlandBlurTimer.start();
-        }
-    }
-
-    onIgnoreAlphaChanged: root.pushHyprlandLayerRules()
-    onBarIgnoreAlphaChanged: root.pushHyprlandLayerRules()
-    onPopupBlurEnabledChanged: root.pushHyprlandLayerRules()
-    onPopupIgnoreAlphaChanged: root.pushHyprlandLayerRules()
-
-    Connections {
+        Connections {
         target: Config.options?.appearance?.transparency ?? null
-        function onPopupsChanged() { root.pushHyprlandLayerRules(); }
-        function onEnableChanged() { root.pushHyprlandLayerRules(); }
     }
 
     property bool _isApplyingRules: false
@@ -418,74 +327,12 @@ Singleton {
     property bool _isApplyingBorder: false
     property bool _borderReapplyPending: false
 
-        function applyHyprlandBorder() {
-        if (!Config.ready)
-            return;
-        if (root._isApplyingBorder) {
-            root._borderReapplyPending = true;
-            return;
-        }
-        root._isApplyingBorder = true;
-        hyprlandBorderCooldownTimer.restart();
-        root.pushBorderSize();
-        root.pushBorderColor();
-    }
-
-    Timer {
-        id: hyprlandRuleCooldownTimer
-        interval: 3000
-        repeat: false
-        onTriggered: {
-            root._isApplyingRules = false;
-            if (!root._rulesReapplyPending)
-                return;
-            root._rulesReapplyPending = false;
-            root.applyHyprlandRules();
-        }
-    }
-
-    function applyHyprlandRules() {
-        if (!Config.ready || root._isApplyingRules)
-            return;
-        root._isApplyingRules = true;
-        hyprlandRuleCooldownTimer.restart();
-
-        Quickshell.execDetached(["hyprctl", "eval", "hl.config({ decoration = { rounding = " + root.windowRounding + " } })"]);
-        root.scheduleBlurUpdate();
-        root.pushHyprlandLayerRules();
-
-        root.applyHyprlandBorder();
-
-        if (Config.options.appearance.gapsIn !== undefined) {
-            Quickshell.execDetached(["hyprctl", "eval", "hl.config({ general = { gaps_in = '" + root.effectiveGapsIn + "' } })"]);
-        }
-        if (Config.options.appearance.gapsOut !== undefined) {
-            Quickshell.execDetached(["hyprctl", "eval", "hl.config({ general = { gaps_out = '" + Config.options.appearance.gapsOut + "' } })"]);
-        }
-
-        let wsStyle = (Config.options.background?.parallax?.vertical ?? false) ? "slidevert" : "slide";
-        Quickshell.execDetached(["hyprctl", "eval", "hl.animation({ leaf = 'workspaces', enabled = true, speed = 7, bezier = 'menu_decel', style = '" + wsStyle + "' })"]);
-    }
-
-    Connections {
-        target: HyprlandConfig
-        function onReloaded() {
-            root.applyHyprlandBorder();
-            if (root._isApplyingRules) {
-                root._rulesReapplyPending = true;
-                return;
-            }
-            root.applyHyprlandRules();
-        }
-    }
-
     Timer {
         id: startupRoundingTimer
         interval: 1500
         running: Config.ready
         repeat: false
         onTriggered: {
-            root.applyHyprlandRules();
         }
     }
 
