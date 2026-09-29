@@ -5,5 +5,5 @@ codeEditor = "~/.config/hypr/hyprland/scripts/launch_first_available.sh 'windsur
 officeSoftware = "~/.config/hypr/hyprland/scripts/launch_first_available.sh 'onlyoffice-desktopeditors' 'wps' 'libreoffice'"  --@g officeSoftware
 -- <<< quickshell:managed:end
 
-hl.env("qsConfig", "end4-pC")
+hl.env("qsConfig", "ii-p3drovfx")
 workspaceGroupSize = 10

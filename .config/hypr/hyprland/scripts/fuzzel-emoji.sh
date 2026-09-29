@@ -1951,3 +1951,81 @@ AH↗️HA↘️HA↗️HA↘️ pekora arrows hahaha rabbit
 🛘 landslide rockfall disaster
 🪊 trombone instrument music
 🪎 treasure chest gold loot pirate
+α alpha
+β beta
+γ gamma
+δ delta
+ε epsilon
+ζ zeta
+η eta
+θ theta
+ι iota
+κ kappa
+λ lambda
+μ mu
+ν nu
+ξ xi
+ο omicron
+π pi
+ρ rho ro
+σ sigma
+τ tau
+υ upsilon
+φ phi
+χ chi
+ψ psi
+ω omega
+Γ big gamma
+Δ big delta
+Θ big theta
+Λ big lambda
+Ξ big xi
+Π big pi
+Σ big sigma
+Φ big phi
+Ψ big psi
+Ω big omega
+µ ts st
+¼ 1/4 quarter
+½ 1/2 half
+¾ 3/4 three fourth
+¿ reverse question mark
+æ ae
+Æ ae
+Þ thorn
+ß ss
+ë e umlaut
+Ë big e umlaut
+ï i umlaut
+Ï big i umlaut
+ö o umlaut
+Ö big o umlaut
+ø slashed o
+Ø big slashed o
+ð eth d
+ñ nh
+Ñ big nh
+ç cedilla
+Ç big cedilla
+ě e caron
+Ě big e caron
+ǎ a caron
+Ǎ big a caron
+ǧ g caron
+Ǧ big g caron
+ǐ i caron
+Ǐ big i caron
+ǒ o caron
+Ǒ big o caron
+Ǔ big u caron
+ǔ u caron
+y̌ y caron
+Y̌ big y caron
+č c caron
+Č big c caron
+š s caron
+Š big s caron
+ž z caron
+Ž big z caron
+ř r caron
+Ř big r caron
