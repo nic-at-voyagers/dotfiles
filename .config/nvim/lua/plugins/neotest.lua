@@ -1,6 +1,6 @@
 return { -- This plugin
       {
-            "Zeioth/compiler.nvim",
+            "nic-at-voyagers/compiler.nvim",
             cmd = {"CompilerOpen", "CompilerToggleResults", "CompilerRedo"},
             dependencies = { "stevearc/overseer.nvim", "nvim-telescope/telescope.nvim" },
             opts = {},

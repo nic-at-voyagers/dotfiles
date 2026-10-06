@@ -8,3 +8,7 @@ vim.opt.tabstop = 8
 vim.opt.shiftwidth = 8
 vim.opt.expandtab = false
 vim.g.lazyvim_python_lsp = "basedpyright"
+
+-- >>> gits:nvim >>>
+require("config.gits-options") -- Ghost in the Shell: square frames, red block cursor
+-- <<< gits:nvim <<<
