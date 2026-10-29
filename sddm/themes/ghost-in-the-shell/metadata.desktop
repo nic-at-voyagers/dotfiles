@@ -5,6 +5,7 @@ Author=gits
 License=MIT
 Type=sddm-theme
 Version=1.0
+Screenshot=sddm.jpg
 MainScript=Main.qml
 ConfigFile=theme.conf
 Theme-Id=ghost-in-the-shell
