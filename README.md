@@ -3,6 +3,6 @@
     <h3></h3>
 </div>
 
-It's just ii-vynx with some tweaks here and there
+ii-p3drovfx, for me
 
-<img width="1918" height="1078" alt="image" src="https://github.com/user-attachments/assets/15e7a7ab-93ee-4e71-b11c-b8fff1373278" />
+<img width="1920" height="1080" alt="Screenshot_2026-09-01_23 30 20" src="https://github.com/user-attachments/assets/dce74980-149f-422d-948e-322ade65675f" />
