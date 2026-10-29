@@ -2,7 +2,6 @@
 hl.config({ dwindle = { smart_split = false } })  --@k dwindle:smart_split
 hl.config({ dwindle = { force_split = 2 } })      --@k dwindle:force_split
 
-
 local prod = function(ds)
 	return ds
 end
@@ -30,7 +29,7 @@ hl.animation({leaf = "fadeLayersIn", enabled = true, speed = prod(2), bezier = "
 hl.animation({leaf = "fadeLayersOut", enabled = true, speed = prod(1.5), bezier = "gits_delete"})
 
 -- workspace
-hl.animation({ leaf = "workspaces", enabled = true, speed = 4, bezier = "gits_lock", style = "slidefade 50%" })
+hl.animation({ leaf = "workspaces", enabled = true, speed = 3, bezier = "gits_lock", style = "slidefade 60%"})
 -- specialWorkspace
 hl.animation({leaf = "specialWorkspace", enabled = true, speed = prod(3), bezier = "gits_zap", style = "slidefadevert 12%"})
 -- zoom
@@ -60,8 +59,8 @@ hl.config({
 			xray = true,
 			special = false,
 			new_optimizations = true,
-			size = 3,
-			passes = 2,
+			size = 5,
+			passes = 3,
 			brightness = 1,
 			noise = 0.00,
 			contrast = 1,
@@ -77,7 +76,7 @@ hl.config({
         kb_layout = "us",
         numlock_by_default = true,
         repeat_delay = 200,
-        repeat_rate = 40,
+        repeat_rate = 45,
 
         follow_mouse = 1,
         off_window_axis_events = 2,
