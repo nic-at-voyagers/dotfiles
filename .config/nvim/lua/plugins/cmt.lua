@@ -6,5 +6,6 @@ return {
 		local ft = require("Comment.ft")
 		ft.set("c",   { "// %s ", "/* %s */" })
 		ft.set("cpp", { "// %s ", "/* %s */" })
+		ft.set("css", { "/* %s */", "/* %s */" })
     end
 }

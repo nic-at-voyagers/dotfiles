@@ -3,6 +3,10 @@
 -- Add any additional keymaps here
 
 -- Typst
+vim.keymap.set("n", "<Space>mu", function()
+  require("typst-preview").update()
+end, { desc = "Start Typst update" })
+
 vim.keymap.set("n", "<Space>ms", function()
   require("typst-preview").start()
 end, { desc = "Start Typst preview" })

@@ -1,12 +1,7 @@
 return {
-	{
-		"kaarmu/typst.vim",
-		ft = "typst",
-	},
-	{
-		"al-kot/typst-preview.nvim",
-		config = function()
-			require("typst-preview").setup({ follow_cursor = false })
-		end,
-	}
+	"lervag/vimtex",
+	lazy = false,
+	init = function()
+		vim.g.vimtex_view_method = "zathura"
+	end
 }

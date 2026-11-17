@@ -15,6 +15,38 @@ vim.api.nvim_create_autocmd("FileType", {
 	end,
 })
 
+vim.api.nvim_create_autocmd("FileType", {
+	pattern = { "tex" },
+	callback = function()
+		vim.bo.shiftwidth = 4
+		vim.bo.tabstop = 4
+	end,
+})
+
+vim.api.nvim_create_autocmd("FileType", {
+	pattern = { "typ" },
+	callback = function()
+		vim.bo.shiftwidth = 4
+		vim.bo.tabstop = 4
+	end,
+})
+
+vim.api.nvim_create_autocmd("FileType", {
+	pattern = { "html" },
+	callback = function()
+		vim.bo.shiftwidth = 4
+		vim.bo.tabstop = 4
+	end,
+})
+
+vim.api.nvim_create_autocmd("FileType", {
+	pattern = { "css" },
+	callback = function()
+		vim.bo.shiftwidth = 4
+		vim.bo.tabstop = 4
+	end,
+})
+
 vim.api.nvim_create_autocmd("VimEnter", {
 	callback = function(data)
 		local arg = data.file
@@ -23,4 +55,15 @@ vim.api.nvim_create_autocmd("VimEnter", {
 			vim.cmd.cd(arg)
 		end
 	end,
+})
+
+vim.api.nvim_create_autocmd('User', {
+  pattern = 'GitConflictDetected',
+  callback = function()
+    vim.notify('Conflict detected in '..vim.fn.expand('<afile>'))
+    vim.keymap.set('n', 'cww', function()
+      engage.conflict_buster()
+      create_buffer_local_mappings()
+    end)
+  end
 })
